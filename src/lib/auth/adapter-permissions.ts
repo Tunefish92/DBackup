@@ -11,6 +11,7 @@ const ADAPTER_PERMISSIONS: Record<string, Permission> = {
     redis: PERMISSIONS.SOURCES.VIEW,
     valkey: PERMISSIONS.SOURCES.VIEW,
     firebird: PERMISSIONS.SOURCES.VIEW,
+    oracle: PERMISSIONS.SOURCES.VIEW,
 
     "local-filesystem": PERMISSIONS.DESTINATIONS.READ,
     // Source-only, but still a storage adapter, and DESTINATIONS.READ is the permission

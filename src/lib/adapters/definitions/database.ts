@@ -142,6 +142,34 @@ export const FirebirdSchema = z.object({
     ...sshFields,
 });
 
+/**
+ * Oracle Database 12.1 and later.
+ *
+ * A database of a job is a schema. Data Pump exports and imports it inside the server, and the
+ * dump file travels over the SQL*Net connection itself, so neither Oracle client tools nor access
+ * to the file system of the server are needed. The service name and the directory object end up
+ * in a connect string and in PL/SQL, which is why both are restricted to the characters Oracle
+ * allows in an unquoted name.
+ */
+export const OracleSchema = z.object({
+    host: z.string().default("localhost"),
+    port: z.coerce.number().default(1521),
+    serviceName: z.string()
+        .min(1, "Service name is required")
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._$#-]*$/, "Service name may only contain letters, digits, dots, underscores, hyphens, $ and #")
+        .describe("Service name of the database or pluggable database, like FREEPDB1"),
+    user: z.string().min(1, "User is required"),
+    password: z.string().optional(),
+    database: z.union([z.string(), z.array(z.string())]).default(""),
+    directory: z.string()
+        .regex(/^[A-Za-z][A-Za-z0-9_$#]{0,127}$/, "Directory object must be an unquoted Oracle name, like DATA_PUMP_DIR")
+        .default("DATA_PUMP_DIR")
+        .describe("Directory object Data Pump writes its dump and log files to"),
+    consistent: z.boolean().default(true).describe("Export each schema as of one point in time"),
+    tls: z.boolean().default(false).describe("Connect with TLS (TCPS)"),
+    ...sshFields,
+});
+
 export const RedisSchema = z.object({
     mode: z.enum(["standalone", "sentinel"]).default("standalone").describe("Connection mode"),
     host: z.string().default("localhost"),
@@ -166,8 +194,9 @@ export type MSSQLConfig = z.infer<typeof MSSQLSchema>;
 export type AzureSQLConfig = z.infer<typeof AzureSQLSchema>;
 export type RedisConfig = z.infer<typeof RedisSchema>;
 export type FirebirdConfig = z.infer<typeof FirebirdSchema>;
+export type OracleConfig = z.infer<typeof OracleSchema>;
 
-export type DatabaseConfig = MySQLConfig | MariaDBConfig | PostgresConfig | MongoDBConfig | SQLiteConfig | MSSQLConfig | AzureSQLConfig | RedisConfig | FirebirdConfig;
+export type DatabaseConfig = MySQLConfig | MariaDBConfig | PostgresConfig | MongoDBConfig | SQLiteConfig | MSSQLConfig | AzureSQLConfig | RedisConfig | FirebirdConfig | OracleConfig;
 
 // Generic type alias for dialect base class (accepts any database config)
 export type AnyDatabaseConfig = DatabaseConfig;

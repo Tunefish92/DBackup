@@ -28,7 +28,7 @@ pnpm test:e2e:ui                       # Playwright UI mode
 
 | Family | Specs | Covers |
 | :--- | :--- | :--- |
-| `postgres`, `mysql`, `mongodb`, `mssql` | `engines.spec.ts` | The containers of the engine, a few also over SSH |
+| `postgres`, `mysql`, `mongodb`, `mssql`, `oracle` | `engines.spec.ts` | The containers of the engine, a few also over SSH. Oracle's run only in the profile `full` |
 | `small` | `engines.spec.ts`, `folders.spec.ts` | Redis, Valkey, Firebird, SQLite over SSH, a folder |
 | `customer` | `engines.spec.ts` | The databases of the customer server over its OpenSSH |
 | `storage` | `storage.spec.ts`, `notifications.spec.ts` | Every destination and every channel, with SQLite inside DBackup as the source |

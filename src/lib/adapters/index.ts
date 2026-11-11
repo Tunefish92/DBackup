@@ -9,6 +9,7 @@ import { AzureSQLAdapter } from "./database/azure-sql";
 import { RedisAdapter } from "./database/redis";
 import { ValkeyAdapter } from "./database/valkey";
 import { FirebirdAdapter } from "./database/firebird";
+import { OracleAdapter } from "./database/oracle";
 import { LocalFileSystemAdapter } from "./storage/local";
 import { DockerVolumeAdapter } from "./storage/docker";
 import { S3GenericAdapter, S3AWSAdapter, S3R2Adapter, S3HetznerAdapter } from "./storage/s3";
@@ -56,6 +57,9 @@ export function registerAdapters() {
     registry.register(withPinnedDatabaseHost(RedisAdapter));
     registry.register(withPinnedDatabaseHost(ValkeyAdapter));
     registry.register(withPinnedDatabaseHost(FirebirdAdapter));
+    // node-oracledb dials inside Node and follows the redirects of its listener, which no pin reaches.
+    // A tenant that blocks the local network is refused Oracle instead, see `announcedHostsReason`.
+    registry.register(OracleAdapter);
 
     // Every storage adapter is registered with its downloads checked, so a download that leaves a
     // link or anything else than a regular file fails, see `downloaded-file.ts`.

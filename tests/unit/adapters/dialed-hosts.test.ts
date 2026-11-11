@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { ADAPTER_DEFINITIONS } from "@/lib/adapters/definitions";
-import { DIALED_HOSTS, HostFormatError, dialedHosts, hostOf, hostsIn, sqlServerHost, urlHost } from "@/lib/adapters/dialed-hosts";
+import { DIALED_HOSTS, HostFormatError, announcedHostsReason, dialedHosts, hostOf, hostsIn, sqlServerHost, urlHost } from "@/lib/adapters/dialed-hosts";
 import { registry } from "@/lib/core/registry";
 import { registerAdapters } from "@/lib/adapters";
 
@@ -15,7 +15,7 @@ describe("the hosts DBackup dials for a connection", () => {
     });
 
     it("dials the host of a database in direct mode and the SSH host alone in SSH mode", () => {
-        for (const adapterId of ["mysql", "mariadb", "postgres", "mongodb", "firebird", "redis", "valkey"]) {
+        for (const adapterId of ["mysql", "mariadb", "postgres", "mongodb", "firebird", "redis", "valkey", "oracle"]) {
             expect(dialedHosts(adapterId, { host: "10.0.0.5", port: 5432 }), adapterId).toEqual(["10.0.0.5"]);
             expect(dialedHosts(adapterId, { host: "127.0.0.1", connectionMode: "ssh", sshHost: "jump.example.com" }), adapterId).toEqual(["jump.example.com"]);
         }
@@ -249,5 +249,20 @@ describe("each host field read as its client reads it", () => {
                 expect(() => dialedHosts("smb", { address }), address).toThrow(HostFormatError);
             }
         });
+    });
+});
+
+describe("hosts a server announces, which no check sees beforehand", () => {
+    it("refuses Oracle in every mode, since its driver follows a redirect of the listener anywhere", () => {
+        expect(announcedHostsReason("oracle", { host: "db.example.com" })).toMatch(/redirects of its listener/);
+        expect(announcedHostsReason("oracle", { host: "127.0.0.1", connectionMode: "ssh", sshHost: "jump.example.com" })).toMatch(/redirects of its listener/);
+    });
+
+    it("lets a MongoDB server alone and every other database through", () => {
+        expect(announcedHostsReason("mongodb", { host: "db.example.com" })).toBeNull();
+        expect(announcedHostsReason("mongodb", { host: "a.example.com,b.example.com" })).not.toBeNull();
+        for (const adapterId of ["mysql", "postgres", "mssql", "firebird", "redis"]) {
+            expect(announcedHostsReason(adapterId, { host: "db.example.com" }), adapterId).toBeNull();
+        }
     });
 });

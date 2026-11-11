@@ -139,6 +139,14 @@ const ADAPTER_RULES: Rule[] = [
         reason: "Bypassing withPool() skips the tunnel and silently connects to the wrong machine.",
     },
     {
+        name: "raw Oracle connection",
+        pattern: /oracledb\.(getConnection|createPool)\s*\(/,
+        allowed: {
+            "database/oracle/connection.ts": "withConnection() is the single wiring point that applies the SSH tunnel.",
+        },
+        reason: "Bypassing withConnection() skips the tunnel and silently connects to the wrong machine.",
+    },
+    {
         name: "direct process spawn",
         pattern: /(?<![.\w])(spawn|execFile|exec)\s*\(/,
         scope: "database/",

@@ -226,6 +226,9 @@ export const DIALED_HOSTS: Readonly<Record<string, HostsOf>> = {
     valkey: redis,
     // `host/port` and `[v6]/port` by the host, see `firebirdHosts`.
     firebird: directOrSsh((config) => firebirdHosts(config.host)),
+    // The host of the Easy Connect string, see `connectString` in `oracle/identifiers.ts`. A redirect
+    // of its listener dials more, which `announcedHostsReason` refuses for a tenant that blocks.
+    oracle: directOrSsh(host),
 
     // Storage
     "local-filesystem": none,
@@ -268,8 +271,15 @@ export const DIALED_HOSTS: Readonly<Record<string, HostsOf>> = {
  * connect to every member of the replica set its servers announce, and the tools take no hook to
  * check them. One host alone is dialed with `directConnection`, see `connectsDirectly`. SQL Server
  * also follows a routing redirect, which its pool checks itself, see `mssql/connector.ts`.
+ *
+ * Oracle in every mode: node-oracledb follows a REDIRECT of the listener to any address it names,
+ * with a proxy of its own if it names one, and dials it from the server DBackup runs on, also when
+ * the first connection went through an SSH tunnel. The driver takes no hook to check that address.
  */
 export function announcedHostsReason(adapterId: string, config: Config): string | null {
+    if (adapterId === "oracle") {
+        return "Oracle follows the redirects of its listener to servers it names, which DBackup cannot check before the driver dials them. A tenant that blocks the local network cannot use Oracle connections.";
+    }
     if (adapterId !== "mongodb" || config.connectionMode === "ssh") return null;
     const mongo = { host: text(config.host), port: Number(config.port) || 27017, uri: text(config.uri) || undefined } as Parameters<typeof connectsDirectly>[0];
     if (connectsDirectly(mongo)) return null;

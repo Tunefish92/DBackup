@@ -151,6 +151,7 @@ What DBackup does in a customer's restore:
 | **MySQL** and **MariaDB** | The dump keeps the `DEFINER` of every view, trigger, routine and event, the account that made it on the server, so they run as that account and not as the login. Give each customer an account of their own |
 | **Firebird** | Refused before anything is read or written. gbak restores with the login of the connection, `SYSDBA` or a login like it, and nothing keeps the code of the database, like a function of an expression index, to the rights of the customer |
 | **Azure SQL Database** | Refused before anything is read or written. SqlPackage imports the BACPAC with the login of the connection, a member of `dbmanager` or the server admin, and creates the database again as that login |
+| **Oracle Database** | Refused before anything is read or written. Data Pump imports the schema with the login of the connection, which holds `DATAPUMP_IMP_FULL_DATABASE`, and code of the schema, like a function of an index, runs with those rights |
 
 A customer who starts the restore of such a database gets this answer, and still downloads its dump:
 

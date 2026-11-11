@@ -32,6 +32,9 @@ const PROXY_BODY_BYTES = CONFIG_UPLOAD_MAX_BYTES + 1024 * 1024;
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The Oracle driver resolves its optional native client at runtime from paths the bundler
+  // cannot follow, so it is loaded from node_modules as it is rather than bundled.
+  serverExternalPackages: ["oracledb"],
   allowedDevOrigins: devOrigins(),
   experimental: {
     proxyClientMaxBodySize: PROXY_BODY_BYTES,

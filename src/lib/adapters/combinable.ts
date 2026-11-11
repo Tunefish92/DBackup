@@ -12,6 +12,7 @@ export const COMBINABLE_WITH_DIRECTORIES: readonly string[] = [
     "postgres",
     "mongodb",
     "firebird",
+    "oracle",
     "mssql",
     "azure-sql",
     "sqlite",

@@ -68,6 +68,7 @@ const DUMP_EXTENSIONS = {
     bak: "bak",
     fbk: "fbk",
     bacpac: "bacpac",
+    dmp: "dmp",
     rdb: "rdb",
     sqlite: "sqlite",
 };

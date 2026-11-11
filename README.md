@@ -47,7 +47,7 @@ Nothing locks you in. Every database backup is a standard dump and every file ba
 ## ✨ Highlights
 
 - **Databases and files in one job** - the dumps and the directories of an application land in one archive and share a restore point
-- **10 databases, direct or over SSH** - from MySQL and PostgreSQL to SQL Server, Redis and Firebird
+- **11 databases, direct or over SSH** - from MySQL and PostgreSQL to SQL Server, Oracle, Redis and Firebird
 - **13 kinds of storage** - S3 and S3-compatible, cloud drives, SFTP, SMB, WebDAV and more, with several destinations per job
 - **Encrypted and open** - AES-256-GCM with managed keys and a Recovery Kit for offline decryption
 - **Incremental backups and smart retention** - store only what changed, and keep daily, weekly, monthly and yearly backups
@@ -70,6 +70,7 @@ Nothing locks you in. Every database backup is a standard dump and every file ba
 | Microsoft SQL Server | 2017, 2019, 2022, Azure SQL Edge | Direct, SSH | Yes |
 | Azure SQL Database (beta) | Single database, elastic pool | Direct | Yes, drops the target first |
 | Firebird (beta) | 3.x, 4.x, 5.x | Direct, SSH | Yes, through configured aliases |
+| Oracle Database (beta) | 12.1 and later | Direct, SSH | Yes, per schema |
 
 **Destinations**: local filesystem, Amazon S3 and S3-compatible storage like Cloudflare R2, Hetzner, MinIO or Wasabi, Google Drive, Dropbox, OneDrive, SFTP, FTP/FTPS, WebDAV, SMB and rsync over SSH. Each of them can also be a source for file backups, and so can Docker volumes.
 

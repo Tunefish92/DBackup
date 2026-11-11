@@ -184,6 +184,9 @@ importers:
       nodemailer:
         specifier: ^10.0.14
         version: 10.0.14
+      oracledb:
+        specifier: ^26.0.0
+        version: 26.0.0
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.3.0)
@@ -272,6 +275,9 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
+      '@types/oracledb':
+        specifier: ^26.0.1
+        version: 26.0.1
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -3030,6 +3036,9 @@ packages:
 
   '@types/node@24.12.2':
     resolution: {integrity: sha512-A1sre26ke7HDIuY/M23nd9gfB+nrmhtYyMINbjI1zHJxYteKR6qSMX56FsmjMcDb3SMcjJg5BiRRgOCC/yBD0g==}
+
+  '@types/oracledb@26.0.1':
+    resolution: {integrity: sha512-+PN2zINSM1vNtRiIz5D2WDboSuMv1YIe66XI3y+X1m4VGz9Ley4yyP65EwnANsBeF1qH/EpKjr5oj6sVIlq8ag==}
 
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
@@ -6041,6 +6050,10 @@ packages:
   ora@8.2.0:
     resolution: {integrity: sha512-weP+BZ8MVNnlCm8c0Qdc1WSWq4Qn7I+9CJGm7Qali6g44e/PUzbjNqJX5NJ9ljlNMosfJvg1fKEGILklK9cwnw==}
     engines: {node: '>=18'}
+
+  oracledb@26.0.0:
+    resolution: {integrity: sha512-ywUqFidj/mPjRjfpOQdzcXT98lhiJzavPCbyPF9JYivcgrpHx7ENj4ZGQDclrpGXeozUBLc5BNXV7yj5qTMxDw==}
+    engines: {node: '>=14.17'}
 
   own-keys@1.0.1:
     resolution: {integrity: sha512-qFOyK5PjiWZd+QQIh+1jhdb9LpxTF0qs7Pm8o5QHYZ0M3vKqSqzsZaEB6oWlxZ+q2sJBMI/Ktgd2N5ZwQoRHfg==}
@@ -10673,6 +10686,10 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/oracledb@26.0.1':
+    dependencies:
+      '@types/node': 24.12.2
+
   '@types/react-dom@19.3.0(@types/react@19.3.0)':
     dependencies:
       '@types/react': 19.3.0
@@ -14043,6 +14060,8 @@ snapshots:
       stdin-discarder: 0.2.2
       string-width: 7.2.0
       strip-ansi: 7.2.0
+
+  oracledb@26.0.0: {}
 
   own-keys@1.0.1:
     dependencies:
