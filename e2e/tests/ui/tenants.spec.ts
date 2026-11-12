@@ -61,6 +61,15 @@ async function psql(database: string, sql: string): Promise<string> {
     return result.stdout.trim();
 }
 
+/**
+ * Like `psql`, for a poll while a restore runs: the restore drops the tables before it creates them
+ * again, and a query in between fails, which only means the restore is not done yet.
+ */
+async function psqlWhileRestoring(database: string, sql: string): Promise<string | null> {
+    const result = await execIn(lab, postgres.service, `psql -U ${postgres.login!.username} -d ${database} -v ON_ERROR_STOP=1 -q -t -A`, sql, 60_000);
+    return result.code === 0 ? result.stdout.trim() : null;
+}
+
 /** What the home tenant holds, read by its admin, never shows to the person of Acme, on the pages and through the API. */
 async function expectNothingOfHome(): Promise<void> {
     const home = new App(admin.request);
@@ -266,7 +275,7 @@ test("Acme restores the backup of its database into it, and the home tenant sees
     });
 
     await test.step("the backup is back in that database, the other one stays as it is", async () => {
-        await expect.poll(() => rows(given), { timeout: 3 * 60_000 }).toBe(given);
+        await expect.poll(() => psqlWhileRestoring(given, "SELECT string_agg(name, ',' ORDER BY name) FROM owner"), { timeout: 3 * 60_000 }).toBe(given);
         expect(await rows(kept)).toBe(`after the backup,${kept}`);
     });
 
@@ -315,6 +324,15 @@ test("a new tenant blocks the local network until the platform allows its range"
     await test.step("the same test now connects", async () => {
         const tested = await theirs.testConnection(connection);
         expect(tested.success, tested.message).toBe(true);
+    });
+
+    await test.step("Oracle stays refused, since its listener names servers of its own", async () => {
+        // Refused before anything is dialed, so no Oracle server has to run for it.
+        const oracle = { adapterId: "oracle", config: { host: postgres.service, port: 1521, serviceName: "LABPDB", user: "acme", password: "unused", directory: "DBACKUP_DIR", connectionMode: "direct" } };
+        const tested = await raw(person.request, "post", "/api/adapters/test-connection", oracle);
+        const said = String(tested.body.message ?? tested.body.error ?? "");
+        expect(said, JSON.stringify(tested)).toContain("A tenant that blocks the local network cannot use Oracle connections.");
+        expect(tested.body.success).not.toBe(true);
     });
 
     await test.step("Acme adds a job of its own", async () => {

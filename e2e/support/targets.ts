@@ -63,10 +63,12 @@ const containers = (engines: Engine[], sshTwins: string[] = []): Target[] => {
 
 /**
  * Oracle runs only in the profile "full", each server wants about 2 GB of memory, so its family
- * takes the containers of every profile.
+ * takes the containers of every profile, and the ones of `sshTwins` once more over SSH.
  */
-const allContainers = (engines: Engine[]): Target[] =>
-    DATABASES.filter((database) => engines.includes(database.engine)).map((database) => container(database));
+const allContainers = (engines: Engine[], sshTwins: string[] = []): Target[] => {
+    const databases = DATABASES.filter((database) => engines.includes(database.engine));
+    return [...databases.map((database) => container(database)), ...databases.filter((database) => sshTwins.includes(database.service)).map((database) => container(database, true))];
+};
 
 const FIREBIRD_3 = "The gbak of Firebird 5, which the image ships, restores into a Firebird 3 server only over the service manager. Over a client connection it fails with a BLR syntax error.";
 
@@ -118,7 +120,7 @@ export const FAMILIES: Family[] = [
     { name: "mysql", targets: containers(["mysql", "mariadb"], ["mysql-57", "mariadb-104"]) },
     { name: "mongodb", targets: containers(["mongodb"]) },
     { name: "mssql", targets: containers(["mssql"]) },
-    { name: "oracle", targets: allContainers(["oracle"]) },
+    { name: "oracle", targets: allContainers(["oracle"], ["oracle-23"]) },
     {
         name: "small",
         targets: [

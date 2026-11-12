@@ -100,6 +100,8 @@ Connected, but the directory DATA_PUMP_DIR is not usable: writing failed (ORA-29
 
 **Solution:** The path of the directory object is missing on the server, or the `oracle` OS user cannot write it. Check it with `SELECT directory_path FROM all_directories WHERE directory_name = 'DATA_PUMP_DIR'` and create the folder. `ORA-29289` or `PLS-00201` means the login lacks `READ, WRITE` on the directory or `EXECUTE` on `UTL_FILE`.
 
+Oracle 21c on a btrfs file system, often under Docker, fails every export with `ORA-48189: OS command to create directory failed` instead, `expdp` too. It does not recognize the folder it keeps for each pluggable database under `DATA_PUMP_DIR` once that exists. Put `$ORACLE_BASE/admin/<SID>/dpdump` on another file system, like a `tmpfs` mount of the container, or use Oracle 23ai.
+
 ### Thin mode cannot connect
 
 ```

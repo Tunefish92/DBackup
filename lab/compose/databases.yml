@@ -368,6 +368,10 @@ services:
     environment: *oracle-env
     ports: ["15521:1521"]
     volumes: [oracle-21:/opt/oracle/oradata]
+    # Oracle 21 takes the folder of a pluggable database under DATA_PUMP_DIR for missing while a
+    # directory reports one link, which btrfs does, tries to create it again and fails every query
+    # of a directory object with ORA-48189. A tmpfs reports the links like ext4.
+    tmpfs: ["/opt/oracle/admin/XE/dpdump:uid=54321,gid=54321,mode=0750"]
     healthcheck: *oracle-health
   oracle-23:
     image: gvenzl/oracle-free:23-slim-faststart
