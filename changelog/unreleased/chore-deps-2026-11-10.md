@@ -1,6 +1,6 @@
 ### 🔒 Security
 
-- **deps**: Next.js 16.4.3 closes a denial of service through Server Actions, and Zod 4.6.7 and nodemailer 10.3.1 close a memory exhaustion in validation and three recipient parsing flaws. `sharp`, `undici`, `qs`, `fast-uri`, `ip-address`, `minimatch`, `fast-xml-parser` and the API reference page move to patched releases, in the app and on the website.
+- **deps**: Next.js 16.4.3 closes a denial of service through Server Actions, and Zod 4.6.7 and nodemailer 10.3.1 close a memory exhaustion in validation and three recipient parsing flaws. `sharp`, `undici`, `qs`, `fast-uri`, `ip-address`, `minimatch`, `fast-xml-parser`, `@azure/identity` with its `@azure/msal-node` and the API reference page move to patched releases, in the app and on the website.
 - **deps**: Prisma 7 replaces the configuration loading of Prisma 6 and its vulnerable `deepmerge-ts`.
 
 ### 🎨 Improvements
