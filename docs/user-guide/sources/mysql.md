@@ -6,7 +6,7 @@ Back up MySQL or MariaDB databases with `mariadb-dump` or `mysqldump`, one datab
 
 | Engine | Versions |
 | :--- | :--- |
-| **MySQL** | 5.7, 8.0, 8.4, 9.0 |
+| **MySQL** | 5.7, 8.0, 8.4, 9.x, 26.x |
 | **MariaDB** | 10.x, 11.x |
 
 ::: tip Older MySQL servers
@@ -148,6 +148,8 @@ DBackup dumps each database of the job on its own, with these flags for the swit
 - `--events` for **Events**
 
 Triggers and views are always included, the dump tools add them on their own. **Extra options** come after these flags, so `--skip-routines` there turns the routines off as well. DBackup adds no flag the extra options already set, and leaves out the snapshot when they contain `--lock-tables` or `--lock-all-tables`, which cannot be combined with it. When the tool is MySQL's own `mysqldump` 5.6.9 or later, DBackup also adds `--set-gtid-purged=OFF`, so a server with GTIDs needs no `RELOAD` and the dump carries no GTID set that a restore onto another server refuses.
+
+On MySQL 26 and later DBackup reads the stored procedures and functions itself with `SHOW CREATE` and writes them into the dump in the shape `mysqldump` uses. The MariaDB dump tool takes these version numbers for MariaDB and asks for packages, which MySQL does not know. A `--routines` in **Extra options** still goes to the dump tool and fails there.
 
 ::: warning MyISAM and Aria tables
 The snapshot only covers transactional tables. MyISAM and Aria tables are read without a lock, so writes to them during the dump can leave them inconsistent. Turn off **Consistent snapshot** for a source whose MyISAM tables change while it is backed up, which locks the tables of each database during its dump instead.

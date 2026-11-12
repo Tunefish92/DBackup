@@ -3,6 +3,7 @@ import { PLATFORM_ADMIN_ROLE } from "@/lib/auth/owner-permissions";
 import { HOME_TENANT_ID } from "@/lib/tenant/home";
 import type { Tx } from "@/lib/prisma-tx";
 import { ensureFullAccessGroup } from "@/services/user/group-service";
+import { OIDC_SCOPES } from "@/services/sso/oidc-provider-service";
 import { counted, exists, idHere, listed, type ImportContext } from "./import-context";
 
 /** A name no group has yet, the wanted one or with a number after it. */
@@ -183,6 +184,9 @@ export async function importSsoProviders({ tx, data, ids, notes }: ImportContext
                 const oidcConfig = JSON.parse(providerData.oidcConfig);
                 if (oidcConfig.clientId) oidcConfig.clientId = encrypt(oidcConfig.clientId);
                 if (oidcConfig.clientSecret) oidcConfig.clientSecret = encrypt(oidcConfig.clientSecret);
+                // A file of an older DBackup keeps the scopes under a key better-auth never reads.
+                if (!Array.isArray(oidcConfig.scopes)) oidcConfig.scopes = OIDC_SCOPES;
+                delete oidcConfig.scope;
                 providerData.oidcConfig = JSON.stringify(oidcConfig);
             } catch { /* parse error, keep as-is */ }
         }

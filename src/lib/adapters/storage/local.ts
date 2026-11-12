@@ -538,6 +538,17 @@ export const LocalFileSystemAdapter: StorageAdapter = {
         }
     },
 
+    /** A directory source only needs to read its folder, so a read-only mount of it passes. */
+    async pingRead(config: { basePath: string }): Promise<{ success: boolean; message: string }> {
+        try {
+            await fs.access(config.basePath, fs.constants.R_OK | fs.constants.X_OK);
+            return { success: true, message: `Read access to ${config.basePath} verified` };
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { success: false, message: `Access failed: ${message}` };
+        }
+    },
+
     async ping(config: { basePath: string }): Promise<{ success: boolean; message: string }> {
         try {
             await fs.access(config.basePath, fs.constants.R_OK | fs.constants.W_OK);

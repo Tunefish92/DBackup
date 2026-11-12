@@ -59,6 +59,12 @@ describe("the mails of a backup run", () => {
     expect(payload.details).toContainEqual({ name: "Encrypted", value: "with Main key" });
   });
 
+  it("puts the outcome of a run in front of the subject of its mail, for mail rules and the inbox", () => {
+    expect(backup(NOTIFICATION_EVENTS.BACKUP_SUCCESS).subject).toBe("Backup Successful: mysql-shop");
+    expect(backup(NOTIFICATION_EVENTS.BACKUP_PARTIAL).subject).toBe("Backup Partial: mysql-shop");
+    expect(backup(NOTIFICATION_EVENTS.BACKUP_FAILURE).subject).toBe("Backup Failed: mysql-shop");
+  });
+
   it("links a finished run to its page", () => {
     const payload = backup(NOTIFICATION_EVENTS.BACKUP_SUCCESS);
 

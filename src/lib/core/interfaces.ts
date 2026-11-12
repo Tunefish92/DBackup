@@ -237,6 +237,13 @@ export interface BaseAdapter {
      * under S3 governance/retention policies. Falls back to test() when not implemented.
      */
     ping?: (config: AdapterConfig, host?: ExecutionHost) => Promise<{ success: boolean; message: string }>;
+
+    /**
+     * Optional check that only reads, for a storage connection that is a directory source, which
+     * DBackup never writes to. A source on a read-only mount passes it where `ping()` asks for
+     * write access. The health check falls back to `ping()` without it.
+     */
+    pingRead?: (config: AdapterConfig, host?: ExecutionHost) => Promise<{ success: boolean; message: string }>;
 }
 
 export type BackupResult = {

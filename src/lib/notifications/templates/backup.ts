@@ -49,6 +49,7 @@ export function backupSuccessTemplate(data: BackupResultData, options?: Template
         : `${data.jobName} finished${data.duration !== undefined ? ` in ${duration(data.duration)}` : ""}.`;
     return {
         title: `${data.jobName} finished`,
+        subject: `Backup Successful: ${data.jobName}`,
         message,
         preheader: done.length > 0
             ? `${data.size !== undefined ? size(data.size) : "The backup"} went to ${names(done.map((dest) => dest.name))}${data.duration !== undefined ? ` in ${duration(data.duration)}` : ""}.`
@@ -85,6 +86,7 @@ export function backupPartialTemplate(data: BackupResultData, options?: Template
         : "Some destinations did not get the backup.";
     return {
         title: `${data.jobName} finished partially`,
+        subject: `Backup Partial: ${data.jobName}`,
         message,
         preheader: data.problem ? `${message} ${data.problem.title}.` : message,
         fields: [
@@ -125,6 +127,7 @@ export function backupFailureTemplate(data: BackupResultData, options?: Template
     const raw = data.problem?.raw ?? data.error;
     return {
         title: `${data.jobName} failed`,
+        subject: `Backup Failed: ${data.jobName}`,
         message,
         preheader: `${data.problem ? `${data.problem.title}.` : message}${last ? ` Last clean run ${last}.` : ""}`,
         fields: [

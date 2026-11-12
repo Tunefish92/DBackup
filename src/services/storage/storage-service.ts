@@ -32,6 +32,7 @@ registerAdapters();
 
 import { describeBackupFromMetadata } from "./backup-file-fields";
 import { readListedSidecars } from "./listed-sidecars";
+import { listingChanges } from "./listing-changes";
 import { readSidecarText } from "@/lib/adapters/storage/common/read-sidecar";
 
 export { describeBackupFromMetadata } from "./backup-file-fields";
@@ -378,9 +379,8 @@ export class StorageService {
             this.refreshInBackground(adapterConfigId, tenant, "rebuild");
             return;
         }
-        await this.mutateStorageListCache(adapterConfigId, (files) =>
-            files.some(f => f.path === entry.path) ? null : [...files, entry]
-        , tenantId);
+        // A run that writes its backup under the name of an earlier one replaces that row.
+        await this.mutateStorageListCache(adapterConfigId, (files) => [...files.filter(f => f.path !== entry.path), entry], tenantId);
     }
 
     async removeStorageListCacheEntry(adapterConfigId: string, filePath: string): Promise<void> {
@@ -558,7 +558,6 @@ export class StorageService {
         });
         const remoteBackups = allRemoteFiles.filter(f => isBackupFile(f.name));
         const remoteMetaFiles = allRemoteFiles.filter(f => f.name.endsWith(METADATA_SIDECAR_SUFFIX));
-        const remotePathSet = new Set(remoteBackups.map(f => f.path));
 
         const cached = await this.readListingRow(adapterConfigId, tenantId);
         if (!cached) return;
@@ -568,17 +567,17 @@ export class StorageService {
         // the current version is left to the next reconciliation, which rebuilds it.
         if (cachedListing.v !== CACHE_SCHEMA_VERSION) return;
         const cachedFiles = cachedListing.files;
-        const cachedPathSet = new Set(cachedFiles.map(f => f.path));
-
-        const removedPaths = new Set([...cachedPathSet].filter(p => !remotePathSet.has(p)));
-        const newFiles = remoteBackups.filter(f => !cachedPathSet.has(f.path));
+        // A backup written again under its path, by a naming template without a time, is read
+        // again like a new one, so its row shows the run that wrote it last.
+        const { removedPaths, freshFiles: newFiles } = listingChanges(cachedFiles, remoteBackups);
 
         if (removedPaths.size === 0 && newFiles.length === 0) {
             await this.writeListingRow(adapterConfigId, tenantId, { cachedAt: new Date() });
             return;
         }
 
-        let updatedFiles = cachedFiles.filter(f => !removedPaths.has(f.path));
+        const freshPaths = new Set(newFiles.map(f => f.path));
+        let updatedFiles = cachedFiles.filter(f => !removedPaths.has(f.path) && !freshPaths.has(f.path));
 
         if (newFiles.length > 0) {
             const newFileNames = new Set(newFiles.map(f => f.name));

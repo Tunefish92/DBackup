@@ -102,6 +102,11 @@ export interface NotificationProblem {
 export interface NotificationPayload {
   /** Short title (email subject, embed title, etc.) */
   title: string;
+  /**
+   * The subject of a mail, when it says more than the title: the outcome of a run in front, which
+   * mail rules and an inbox list read. Without it the title is the subject.
+   */
+  subject?: string;
   /** Plain text message body */
   message: string;
   /** Structured fields for rich display (embeds, tables) */

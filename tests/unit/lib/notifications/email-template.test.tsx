@@ -42,6 +42,14 @@ describe("the notification mail", () => {
     expect(html).toContain("· Production");
   });
 
+  it("takes the subject of the payload over its title, which stays the heading of the mail", async () => {
+    const { html, subject } = await renderNotificationEmail({ ...FAILED, subject: "Backup Failed: postgres-nightly" }, BRAND);
+
+    expect(subject).toBe("Backup Failed: postgres-nightly");
+    expect(html).toContain("<title>Backup Failed: postgres-nightly</title>");
+    expect(html).toContain("postgres-nightly failed");
+  });
+
   it("lists the fields the tiles leave out when the payload names no details", async () => {
     const { text } = await renderNotificationEmail(FAILED, BRAND);
 

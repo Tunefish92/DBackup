@@ -7,8 +7,10 @@
 # No bind mounts except the MSSQL backup folder, so the file runs unchanged on a remote Docker
 # host through a docker context. Credentials are test values and live in the catalog as well.
 
+# Over TCP: the first start of a volume runs a server for its init scripts on the socket alone and
+# then restarts it, so a ping on the socket passes before the server that stays is up.
 x-mysql-health: &mysql-health
-  test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+  test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpassword"]
   interval: 5s
   timeout: 20s
   retries: 20
@@ -103,6 +105,15 @@ services:
     environment: *mysql-env
     ports: ["33390:3306"]
     volumes: [mysql-9:/var/lib/mysql]
+    healthcheck: *mysql-health
+  # The first version the MariaDB dump tool takes for MariaDB 10.3 or later.
+  mysql-26:
+    image: mysql:26
+    restart: unless-stopped
+    profiles: ["core"]
+    environment: *mysql-env
+    ports: ["33326:3306"]
+    volumes: [mysql-26:/var/lib/mysql]
     healthcheck: *mysql-health
 
   # ── MariaDB ─────────────────────────────────────────────
@@ -387,6 +398,7 @@ volumes:
   mysql-80:
   mysql-84:
   mysql-9:
+  mysql-26:
   mariadb-104:
   mariadb-1011:
   mariadb-114:

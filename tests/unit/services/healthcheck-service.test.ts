@@ -86,6 +86,44 @@ describe('HealthCheckService', () => {
         }));
     });
 
+    it('checks a directory source by reading only, so a read-only mount of it stays online', async () => {
+        prismaMock.adapterConfig.findMany.mockResolvedValue([
+            { id: 'src', name: 'App data', adapterId: 'local-filesystem', config: '{}', consecutiveFailures: 0, type: 'storage', storageRole: 'SOURCE' },
+        ] as any);
+        const local = {
+            ping: vi.fn().mockResolvedValue({ success: false, message: 'Access failed: EROFS' }),
+            pingRead: vi.fn().mockResolvedValue({ success: true, message: 'Read access verified' }),
+        };
+        (registry.get as any).mockReturnValue(local);
+
+        await service.performHealthCheck();
+
+        expect(local.pingRead).toHaveBeenCalled();
+        expect(local.ping).not.toHaveBeenCalled();
+        expect(prismaMock.adapterConfig.update).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ lastStatus: 'ONLINE', consecutiveFailures: 0 }),
+        }));
+    });
+
+    it('still asks a destination for write access', async () => {
+        prismaMock.adapterConfig.findMany.mockResolvedValue([
+            { id: 'dst', name: 'NAS', adapterId: 'local-filesystem', config: '{}', consecutiveFailures: 0, type: 'storage', storageRole: 'DESTINATION' },
+        ] as any);
+        const local = {
+            ping: vi.fn().mockResolvedValue({ success: false, message: 'Access failed: EROFS' }),
+            pingRead: vi.fn().mockResolvedValue({ success: true, message: 'Read access verified' }),
+        };
+        (registry.get as any).mockReturnValue(local);
+
+        await service.performHealthCheck();
+
+        expect(local.ping).toHaveBeenCalled();
+        expect(local.pingRead).not.toHaveBeenCalled();
+        expect(prismaMock.adapterConfig.update).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ lastStatus: 'DEGRADED' }),
+        }));
+    });
+
     it('should transition to DEGRADED on first failure', async () => {
         // Arrange
         const mockAdapters = [

@@ -44,4 +44,17 @@ describe("the backup a run adds to the listing of its destination", () => {
         expect(mutate).toHaveBeenCalled();
         expect(refresh).not.toHaveBeenCalled();
     });
+
+    it("replaces the row of a backup an earlier run wrote under the same name", async () => {
+        const old = { name: "shop.tar", path: "nightly/shop.tar", size: 8, lastModified: new Date(0), createdAt: "2026-10-22T11:52:00.000Z" };
+        const other = { name: "crm.tar", path: "nightly/crm.tar", size: 3, lastModified: new Date(0) };
+        vi.spyOn(service, "listingTenant").mockResolvedValue("default");
+        vi.spyOn(service, "loadCurrentCache").mockResolvedValue({ files: [old, other], v: 5 });
+        const mutate = vi.spyOn(service, "mutateStorageListCache").mockResolvedValue();
+
+        await storageService.appendStorageListCacheEntry("nas", entry);
+
+        const change = mutate.mock.calls[0][1] as (files: unknown[]) => unknown[] | null;
+        expect(change([old, other])).toEqual([other, entry]);
+    });
 });
