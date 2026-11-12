@@ -44,11 +44,16 @@ CREATE PROCEDURE mark_paid(IN order_id INT)
 BEGIN
     UPDATE orders SET paid = TRUE WHERE id = order_id;
 END //
+CREATE FUNCTION net_amount(amount DECIMAL(12, 2)) RETURNS DECIMAL(12, 2) DETERMINISTIC
+    RETURN ROUND(amount / 1.081, 2) //
 CREATE TRIGGER orders_amount_check BEFORE INSERT ON orders FOR EACH ROW
 BEGIN
     IF NEW.amount < 0 THEN SET NEW.amount = 0; END IF;
 END //
 DELIMITER ;
+
+-- A view that calls a function, which MySQL creates only once the function exists.
+CREATE VIEW order_net AS SELECT id, net_amount(amount) AS net FROM orders;
 
 CREATE EVENT nightly_cleanup ON SCHEDULE EVERY 1 DAY DISABLE DO DELETE FROM orders WHERE paid = FALSE AND ordered_on < '1971-01-01';
 
