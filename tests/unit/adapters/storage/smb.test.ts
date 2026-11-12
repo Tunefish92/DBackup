@@ -129,6 +129,27 @@ describe("SMBAdapter", () => {
             expect(mockMkdir.mock.calls.map((call) => call[0])).toEqual(["backups/tenants", "backups/tenants/t-globex", "backups/tenants/t-globex/Nightly", "backups/tenants/t-globex/Weekly"]);
         });
 
+        it("stops before the upload with the folder and the status when the share refuses a folder", async () => {
+            // smbclient ends with code 0 on a failed mkdir and only prints the status.
+            mockMkdir.mockResolvedValueOnce("NT_STATUS_ACCESS_DENIED making remote directory \\backups\\Job");
+            mockList.mockResolvedValueOnce([]);
+            const messages: string[] = [];
+
+            const result = await SMBAdapter.upload(config, "/tmp/backup.sql", "Job/backup.sql", undefined, (message) => messages.push(message));
+
+            expect(result).toBe(false);
+            expect(mockSendFile).not.toHaveBeenCalled();
+            expect(messages.join("\n")).toContain("The folder backups/Job could not be created on the share: NT_STATUS_ACCESS_DENIED");
+        });
+
+        it("goes on when a refused folder is there after all", async () => {
+            mockMkdir.mockResolvedValueOnce("NT_STATUS_ACCESS_DENIED making remote directory \\backups\\Job");
+            mockList.mockResolvedValueOnce([{ name: "Job", type: "D", size: 0, modifyTime: new Date() }]);
+
+            await expect(SMBAdapter.upload(config, "/tmp/backup.sql", "Job/backup.sql")).resolves.toBe(true);
+            expect(mockList).toHaveBeenCalledWith("backups/Job");
+        });
+
         it("returns false when sendFile throws", async () => {
             mockSendFile.mockRejectedValue(new Error("Access denied"));
 

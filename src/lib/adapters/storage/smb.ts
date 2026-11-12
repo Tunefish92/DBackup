@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs/promises";
 import { withPrivateTempDir, writeNewFile } from "@/lib/private-temp-dir";
 import { runSmbclient } from "./smb-run";
+import { ntStatuses, parseSmbDir, type SmbDirEntry } from "./smb-listing";
 import { smbAddressOptions } from "./smb-pin";
 import { assertReadSize, FileTooLargeError, isFileTooLarge, readLimitOf, textOf } from "@/lib/adapters/storage/common/read-limit";
 import { createListingGuard, ListingTooLargeError } from "@/lib/adapters/storage/common/listing-limits";
@@ -52,13 +53,8 @@ interface SMBConfig {
     pathPrefix?: string;
 }
 
-/** An entry of a folder as samba-client reads it from the output of `dir`. */
-interface SmbListItem {
-    name: string;
-    type: string;
-    size: number;
-    modifyTime: Date;
-}
+/** An entry of a folder as the adapter reads it from the output of `dir`. */
+type SmbListItem = SmbDirEntry;
 
 /**
  * The commands of samba-client this adapter runs. Every path that goes into the command line of
@@ -124,6 +120,15 @@ class ResolvingSambaClient extends SambaClient {
     execute = async (smbCommand: string, smbCommandArgs: string | string[], workingDir?: string): Promise<string> =>
         runSmbclient([...this.getSmbClientArgs(smbCommand, smbCommandArgs), ...await this.addressOptions()], { cwd: workingDir, password: this.secret, signal: this.signal });
 }
+
+/**
+ * The entries of a folder, read with `parseSmbDir`, which keeps the rows samba-client's own `list`
+ * drops. Set on the prototype, since the types of samba-client declare `list` as a property, which
+ * a method of the class may not override.
+ */
+(ResolvingSambaClient.prototype as unknown as { list(remotePath: string): Promise<SmbDirEntry[]> }).list = async function (this: ResolvingSambaClient, remotePath: string) {
+    return parseSmbDir(await this.execute("dir", [remotePath], ""));
+};
 
 /**
  * Creates a client for the share. samba-client quotes each path without escaping it and hands
@@ -206,22 +211,50 @@ function readableEntry(config: SMBConfig, folder: string, name: string): boolean
     return false;
 }
 
+/** Whether a folder is there, asked by listing the entry itself, which `dir` matches by its name. */
+async function folderExists(client: SmbClient, dir: string): Promise<boolean> {
+    try {
+        const name = path.posix.basename(dir);
+        return (await client.list(dir)).some((item) => item.name === name && item.type.includes("D"));
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Makes one folder. smbclient ends with code 0 when `mkdir` fails and only prints the status, so
+ * the output decides. A folder that exists answers `NT_STATUS_OBJECT_NAME_COLLISION`. Any other
+ * status fails here, with the folder and the status, instead of later at the upload with a
+ * message that names neither, unless the folder turns out to be there, as on a server that
+ * refuses a `mkdir` of a folder it already has with `NT_STATUS_ACCESS_DENIED`.
+ */
+async function makeFolder(client: SmbClient, dir: string): Promise<void> {
+    let output: string;
+    try {
+        output = String((await client.mkdir(dir, "/")) ?? "");
+    } catch (error: unknown) {
+        output = error instanceof Error ? error.message : String(error);
+    }
+    const failed = ntStatuses(output).filter((status) => status !== "NT_STATUS_OBJECT_NAME_COLLISION");
+    if (failed.length === 0 || await folderExists(client, dir)) {
+        return;
+    }
+    throw new Error(`The folder ${dir} could not be created on the share: ${failed[0]}`);
+}
+
 /**
  * Creates every folder of a remote path below the folder setting, one after the other, since
- * smbclient creates no missing parents: a first backup to `tenants/<id>/<job>/` needs three. A
- * folder that exists already answers with an error, which is ignored, and a folder that cannot be
- * made shows in the error of the upload. `made` keeps the folders made in this session.
+ * smbclient creates no missing parents: a first backup to `tenants/<id>/<job>/` needs three.
+ * `made` keeps the folders made in this session.
  */
 async function ensureDir(client: SmbClient, config: SMBConfig, remotePath: string, made: Set<string>): Promise<void> {
     const parts = path.posix.dirname(remotePath.replace(/\\/g, "/")).split("/").filter((part) => part !== "" && part !== ".");
     for (let depth = 1; depth <= parts.length; depth++) {
         const dir = resolvePath(config, parts.slice(0, depth).join("/"));
-        if (made.has(dir)) continue;
-        try {
-            await client.mkdir(dir, "/");
-        } catch {
-            // The folder may exist already.
+        if (made.has(dir)) {
+            continue;
         }
+        await makeFolder(client, dir);
         made.add(dir);
     }
 }
@@ -510,9 +543,8 @@ export const SMBAdapter: StorageAdapter = {
         const destination = resolvePath(config, testFileName);
 
         try {
-            // Ensure test subfolder exists (two-step: samba-client does not handle nested mkdir)
-            await client.mkdir(resolvePath(config, '.dbackup'), '/').catch(() => {});
-            await client.mkdir(resolvePath(config, '.dbackup/test'), '/').catch(() => {});
+            // The folders of the test file, which fail here with the status when the share refuses them.
+            await ensureDir(client, config, testFileName, new Set());
 
             await withPrivateTempDir("smb-test-", async (dir) => {
                 // A file of a folder of its own, see `withPrivateTempDir`.
