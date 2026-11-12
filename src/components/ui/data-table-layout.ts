@@ -1,10 +1,11 @@
-import type { ColumnDef, RowData } from "@tanstack/react-table";
+import type { CellData, RowData, TableFeatures } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import type { TableDensity, TablePreferences } from "@/lib/core/table-preferences";
 
 declare module "@tanstack/react-table" {
     // The generics have to match TanStack's declaration for the merge to work.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    interface ColumnMeta<TData extends RowData, TValue> {
+    interface ColumnMeta<in out TFeatures extends TableFeatures, in out TData extends RowData, TValue extends CellData = CellData> {
         /** Name in the column menu. Falls back to the header when that is a string. */
         label?: string;
         /** "start" keeps a column in front, "end" at the back. A pinned column can not be moved or hidden. */
@@ -16,7 +17,7 @@ declare module "@tanstack/react-table" {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    interface TableMeta<TData extends RowData> {
+    interface TableMeta<in out TFeatures extends TableFeatures, in out TData extends RowData> {
         /** The row height of the table, for cells that lay out differently when compact. */
         density?: TableDensity;
     }
@@ -43,11 +44,11 @@ export interface ColumnLayout {
 }
 
 /** TanStack derives a column's id from its accessor key when it has no explicit id. */
-export function columnId<TData, TValue>(column: ColumnDef<TData, TValue>): string {
+export function columnId<TData extends RowData, TValue>(column: AppColumnDef<TData, TValue>): string {
     return column.id ?? (column as { accessorKey?: string }).accessorKey ?? "";
 }
 
-export function layoutColumns<TData, TValue>(columns: ColumnDef<TData, TValue>[]): LayoutColumn[] {
+export function layoutColumns<TData extends RowData, TValue>(columns: AppColumnDef<TData, TValue>[]): LayoutColumn[] {
     return columns.map((column) => {
         const id = columnId(column);
         return {

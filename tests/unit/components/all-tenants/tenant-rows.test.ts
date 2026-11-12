@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { compareTenantNames, matchesTenants, TENANT_COLUMN_ID, tenantFilterOptions, withTenantColumn } from "@/components/tenant/tenant-rows";
 
 const TENANTS = [
@@ -9,8 +9,8 @@ const TENANTS = [
 ];
 
 type Row = { name: string };
-const column = (id: string, pin?: "start" | "end"): ColumnDef<Row> => ({ id, ...(pin ? { meta: { pin } } : {}) });
-const ids = (columns: ColumnDef<Row>[]) => columns.map((entry) => entry.id);
+const column = (id: string, pin?: "start" | "end"): AppColumnDef<Row> => ({ id, ...(pin ? { meta: { pin } } : {}) });
+const ids = (columns: AppColumnDef<Row>[]) => columns.map((entry) => entry.id);
 
 describe("the Tenant filter of a list in All tenants", () => {
     it("offers the tenants that hold a row, each once and by name", () => {

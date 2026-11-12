@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import {
     Activity,
     Archive,
@@ -127,7 +127,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the system tasks. */
-export function taskColumns({ handlersOf, switching, renderActions }: ColumnOptions): ColumnDef<SystemTaskRow>[] {
+export function taskColumns({ handlersOf, switching, renderActions }: ColumnOptions): AppColumnDef<SystemTaskRow>[] {
     return [
         {
             accessorKey: "name",

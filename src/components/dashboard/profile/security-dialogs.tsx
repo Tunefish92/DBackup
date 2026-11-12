@@ -222,13 +222,15 @@ export function TwoFactorOnDialog({ open, onOpenChange, onDone }: { open: boolea
     const start = async () => {
         setBusy(true);
         try {
-            const result = await authClient.twoFactor.enable({ password });
+            const result = await authClient.twoFactor.enable({ password, method: "totp" });
             if (result.error) {
                 toast.error(result.error.message || "The authenticator app could not be set up.");
                 return;
             }
-            setUri(result.data?.totpURI ?? null);
-            setCodes(result.data?.backupCodes ?? []);
+            // Only the authenticator app answers with a code to scan and backup codes.
+            const totp = result.data?.method === "totp" ? result.data : null;
+            setUri(totp?.totpURI ?? null);
+            setCodes(totp?.backupCodes ?? []);
             setStep("scan");
         } catch (error) {
             log.warn("Starting the authenticator app failed", {}, wrapError(error));

@@ -10,6 +10,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { NotFoundError, ValidationError } from "@/lib/logging/errors";
 import { tenantScopeExtension } from "@/lib/tenant/prisma-scope";
 
@@ -39,7 +40,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     holder.client = base.$extends(tenantScopeExtension(async () => null)) as unknown as PrismaClient;
 
     await base.tenant.create({ data: { id: "acme", name: "Acme" } });

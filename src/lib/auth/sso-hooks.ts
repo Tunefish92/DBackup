@@ -41,8 +41,10 @@ export async function afterSsoUser(user: { id: string; name: string; email: stri
 /**
  * Before an account is linked to a provider: a provider links no account it may not sign in. On a
  * callback the refusal throws, since better-auth goes on after a link that returned nothing, marks
- * the email as verified, which `allowTenantSsoLink` reads, and starts a session. better-auth answers
- * a failed link with an error of its own, which `refusedSsoLinkRedirect` replaces with the reason.
+ * the email as verified, which `allowTenantSsoLink` reads, and starts a session. The refusal is the
+ * redirect to the login page that says why, since better-auth 1.7 hands an error of a hook on as
+ * the answer of the callback. A version that answers a failed link with an error of its own gets
+ * the reason from `refusedSsoLinkRedirect`.
  */
 export async function beforeSsoLink(account: { userId: string; accountId?: string }, context: SsoDatabaseHookContext): Promise<false | undefined> {
     const callback = isSsoCallback(context?.path);
@@ -50,7 +52,7 @@ export async function beforeSsoLink(account: { userId: string; accountId?: strin
     if (!callback) return allowed ? undefined : false;
     const refusedUrl = allowed ? undefined : ((await tenantRefusalUrl(account.userId, context)) ?? NOT_LINKED_URL);
     if (context?.request) callbackLinks.set(context.request, { accountId: account.accountId, refusedUrl });
-    if (refusedUrl) throw new APIError("FORBIDDEN", { message: "account not linked" });
+    if (refusedUrl) throw context?.redirect?.(refusedUrl) ?? new APIError("FORBIDDEN", { message: "account not linked" });
     return undefined;
 }
 

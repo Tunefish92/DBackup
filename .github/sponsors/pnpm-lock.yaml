@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       sponsorkit:
-        specifier: 18.0.0
-        version: 18.0.0
+        specifier: 19.0.0
+        version: 19.0.0
 
 packages:
 
@@ -186,8 +186,8 @@ packages:
     resolution: {integrity: sha512-9k3v7xcHwgdO/DruxGIg4HtjvlAZlcnsX/mzqUb1t3NkYnl9kK2UJ+Gq0io+vQf7iT//BD/HB/NBkUR1LWxoeA==}
     engines: {node: '>=14'}
 
-  cac@7.0.0:
-    resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
+  cac@7.1.0:
+    resolution: {integrity: sha512-LMDU/U2yA4IPIY8KT0NsNPWEYZvAMkbgyspxJ6btJaYV+WMDOHAZCmB0lsTObiHaRS1V/ztKAl7+TSkTqXyeoA==}
     engines: {node: '>=20.19.0'}
 
   consola@3.4.2:
@@ -215,9 +215,9 @@ packages:
   node-fetch-native@1.6.7:
     resolution: {integrity: sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==}
 
-  normalize-url@9.0.1:
-    resolution: {integrity: sha512-ARftfC5HdUNu9jJeL8pHj8debUIHA2b91FizCoMzY4lG6dDX13jdvTK0TBe24IBDRf2HvJSzzwEPvmbkQWHRSg==}
-    engines: {node: '>=20'}
+  normalize-url@10.0.0:
+    resolution: {integrity: sha512-aZEiiOP3lVdNrCCdPELWvJHbjJjoPfbWRLPAZLSsGA6l4ckvPmZSB+uX6JB4QQu33SeXCsd6v75jKivr43n/EQ==}
+    engines: {node: '>=22'}
 
   ofetch@1.5.1:
     resolution: {integrity: sha512-2W4oUZlVaqAPAil6FUg/difl6YhqhUR7x2eZY4bQCko22UXg3hptq9KLQdqFClV+Wu85UX7hNtdGTngi/1BxcA==}
@@ -243,8 +243,8 @@ packages:
       '@types/node':
         optional: true
 
-  sponsorkit@18.0.0:
-    resolution: {integrity: sha512-9Jr+n4SjU8Qtldq8i0UlwwqBEAVy5JFbIQNXRUIs1N+LPTCnX2/of5oyHYftCLi3KxAODVMmyEdWqkJMTagR6w==}
+  sponsorkit@19.0.0:
+    resolution: {integrity: sha512-srRaflySPU40DjZ07DUnxF9VhnbotupyIs1ahUXNLWf+T2V75uELRxCEmzeB7CE3WYhrsLC2JYRrtNlWQlPmtw==}
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
     hasBin: true
 
@@ -383,7 +383,7 @@ snapshots:
 
   ansis@4.4.0: {}
 
-  cac@7.0.0: {}
+  cac@7.1.0: {}
 
   consola@3.4.2: {}
 
@@ -399,7 +399,7 @@ snapshots:
 
   node-fetch-native@1.6.7: {}
 
-  normalize-url@9.0.1: {}
+  normalize-url@10.0.0: {}
 
   ofetch@1.5.1:
     dependencies:
@@ -447,13 +447,13 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
 
-  sponsorkit@18.0.0:
+  sponsorkit@19.0.0:
     dependencies:
       ansis: 4.4.0
-      cac: 7.0.0
+      cac: 7.1.0
       consola: 3.4.2
       d3-hierarchy: 3.1.2
-      normalize-url: 9.0.1
+      normalize-url: 10.0.0
       ofetch: 1.5.1
       p-limit: 7.3.3
       sharp: 0.35.5

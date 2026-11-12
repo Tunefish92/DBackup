@@ -1,7 +1,8 @@
 "use client";
 
+import type { RowData } from "@tanstack/react-table";
 import { useMemo } from "react";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Building2 } from "lucide-react";
 import type { DataTableFilterableColumn } from "@/components/ui/data-table-types";
 import { cn } from "@/lib/utils";
@@ -26,13 +27,13 @@ export function TenantLine({ name, className }: { name: string | null; className
     );
 }
 
-interface TenantColumns<TData> {
+interface TenantColumns<TData extends RowData> {
     /** A platform admin looks at every tenant, the only time the column shows. */
     allTenants: boolean;
     /** The name of a tenant by its id. */
     nameOf: (tenantId: string | null | undefined) => string | null;
     /** The Tenant column, null outside All tenants. */
-    column: ColumnDef<TData> | null;
+    column: AppColumnDef<TData> | null;
     /** The Tenant filter, null outside All tenants. */
     filter: DataTableFilterableColumn<TData> | null;
 }
@@ -45,14 +46,14 @@ interface TenantColumns<TData> {
  * the filter offers every tenant. `always` shows both in any view, for a list of the Platform,
  * which holds the rows of every tenant from inside a tenant too.
  */
-export function useTenantColumns<TData>(tenantIdOf: (row: TData) => string | null | undefined, rows?: readonly TData[], options: { always?: boolean } = {}): TenantColumns<TData> {
+export function useTenantColumns<TData extends RowData>(tenantIdOf: (row: TData) => string | null | undefined, rows?: readonly TData[], options: { always?: boolean } = {}): TenantColumns<TData> {
     const { allTenants } = useTenantView();
     // The tenants the viewer may open, and on the Platform the others it names too.
     const tenants = useNamedTenants();
     const nameOf = useTenantName();
     const shown = allTenants || options.always === true;
 
-    const column = useMemo<ColumnDef<TData> | null>(() => {
+    const column = useMemo<AppColumnDef<TData> | null>(() => {
         if (!shown) return null;
         return {
             id: TENANT_COLUMN_ID,
@@ -60,7 +61,7 @@ export function useTenantColumns<TData>(tenantIdOf: (row: TData) => string | nul
             header: "Tenant",
             meta: { label: "Tenant" },
             enableSorting: true,
-            sortingFn: (a, b, id) => compareTenantNames((tenantId) => nameOf(tenantId), a.getValue<string>(id), b.getValue<string>(id)),
+            sortFn: (a, b, id) => compareTenantNames((tenantId) => nameOf(tenantId), a.getValue<string>(id), b.getValue<string>(id)),
             filterFn: (row, id, value: string[]) => matchesTenants(row.getValue<string>(id), value),
             cell: ({ row }) => <TenantCell name={nameOf(tenantIdOf(row.original))} />,
         };

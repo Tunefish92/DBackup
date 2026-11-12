@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DateDisplay } from "@/components/utils/date-display";
 import { cn } from "@/lib/utils";
 import type { VaultKey } from "@/services/vault/vault-types";
@@ -44,7 +44,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the encryption keys. Name and actions stay put, the rest can move and hide. */
-export function keyColumns({ onOpen, renderActions }: ColumnOptions): ColumnDef<VaultKey>[] {
+export function keyColumns({ onOpen, renderActions }: ColumnOptions): AppColumnDef<VaultKey>[] {
     return [
         {
             accessorKey: "name",

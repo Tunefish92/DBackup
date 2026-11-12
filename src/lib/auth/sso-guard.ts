@@ -84,6 +84,17 @@ export function isSsoManagementRequest(path: string | undefined, fromBrowser: bo
 export const TENANT_SIGN_UP_REFUSED = "tenant sign-in refused";
 
 /**
+ * The refusal of a new account on a callback of a provider. Since better-auth 1.7 the SSO plugin
+ * sends the browser to the error page of the login only for an error with a code, `error` being
+ * the code and `error_description` the message, and answers any other with a bare 403. The code is
+ * the message in capitals with underscores, which `api/auth/error/error` maps onto the problem the
+ * login page shows.
+ */
+export function ssoSignUpRefusal(message: string): APIError {
+    return new APIError("FORBIDDEN", { message, code: message.toUpperCase().replace(/[^A-Z0-9]+/g, "_") });
+}
+
+/**
  * Runs before better-auth adds a user. Someone new through a provider is added only while the
  * provider is on and adds new people, whatever the browser asked for. A provider of a tenant adds
  * only an email of its own domain, since its tenant runs the identity provider and vouches for
@@ -93,10 +104,10 @@ export async function refuseSsoSignUp(context: SsoHookContext | null | undefined
     const providerId = ssoProviderIdOf(context);
     if (!providerId) return;
     const provider = await prisma.ssoProvider.findUnique({ where: { providerId }, select: { enabled: true, allowProvisioning: true, tenantId: true, domain: true, defaultGroupId: true } });
-    if (!provider?.enabled || !provider.allowProvisioning) throw new APIError("FORBIDDEN", { message: "signup disabled" });
+    if (!provider?.enabled || !provider.allowProvisioning) throw ssoSignUpRefusal("signup disabled");
     // A provider of a tenant adds people only into a group of its tenant, never as accounts of no tenant.
-    if (provider.tenantId && !provider.defaultGroupId) throw new APIError("FORBIDDEN", { message: "signup disabled" });
-    if (provider.tenantId && !emailOfDomain(user?.email, provider.domain)) throw new APIError("FORBIDDEN", { message: TENANT_SIGN_UP_REFUSED });
+    if (provider.tenantId && !provider.defaultGroupId) throw ssoSignUpRefusal("signup disabled");
+    if (provider.tenantId && !emailOfDomain(user?.email, provider.domain)) throw ssoSignUpRefusal(TENANT_SIGN_UP_REFUSED);
 }
 
 /** What better-auth hands on when an email belongs to a tenant with a provider of its own, which the login page turns into its message. */
@@ -114,8 +125,8 @@ export async function refuseClaimedSsoSignUp(context: SsoHookContext | null | un
     const provider = await prisma.ssoProvider.findUnique({ where: { providerId }, select: { tenantId: true } });
     // A provider of a tenant adds only emails of its own domain, see refuseSsoSignUp.
     if (!provider || provider.tenantId) return;
-    if (!user?.email) throw new APIError("FORBIDDEN", { message: "signup disabled" });
-    if (await claimedEmailRefusal(user.email, [HOME_TENANT_ID], false)) throw new APIError("FORBIDDEN", { message: TENANT_DOMAIN_SIGN_UP_REFUSED });
+    if (!user?.email) throw ssoSignUpRefusal("signup disabled");
+    if (await claimedEmailRefusal(user.email, [HOME_TENANT_ID], false)) throw ssoSignUpRefusal(TENANT_DOMAIN_SIGN_UP_REFUSED);
 }
 
 /**

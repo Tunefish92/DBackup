@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Copy, Eye, Pencil, Trash } from "lucide-react";
 import type { BackupActionGroup } from "@/components/dashboard/storage/explorer/backup-actions";
 import { MemberFaces } from "@/components/dashboard/groups/group-cells";
@@ -70,7 +70,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the platform groups: the group, its rights on the platform and in the tenants, where, its members and when it changed. */
-export function platformGroupColumns({ tenants, onOpen, renderActions }: ColumnOptions): ColumnDef<PlatformGroupRow>[] {
+export function platformGroupColumns({ tenants, onOpen, renderActions }: ColumnOptions): AppColumnDef<PlatformGroupRow>[] {
     return [
         {
             accessorKey: "name",

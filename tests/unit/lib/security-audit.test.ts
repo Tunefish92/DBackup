@@ -60,7 +60,7 @@ beforeEach(() => {
 
 describe("the own second factor in the audit log", () => {
     it("writes the setup of the app, the code that turns it on, turning it off and new backup codes", async () => {
-        await request("/two-factor/enable", { password: "secret" }, { totpURI: "otpauth://x", backupCodes: [] });
+        await request("/two-factor/enable", { password: "secret" }, { method: "totp", totpURI: "otpauth://x", backupCodes: [] });
         await request("/two-factor/verify-totp", { code: "123456" }, { token: "t" });
         await request("/two-factor/disable", { password: "secret" }, { status: true });
         await request("/two-factor/generate-backup-codes", { password: "secret" }, { status: true, backupCodes: [] });

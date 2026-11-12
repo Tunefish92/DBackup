@@ -1,7 +1,8 @@
 "use client";
 
+import type { RowData } from "@tanstack/react-table";
 import * as React from "react";
-import { Table } from "@tanstack/react-table";
+import type { AppTable } from "@/components/ui/table-features";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +11,8 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 import type { DataTableFilterableColumn } from "./data-table-types";
 
-interface DataTableToolbarProps<TData> {
-    table: Table<TData>;
+interface DataTableToolbarProps<TData extends RowData> {
+    table: AppTable<TData>;
     searchKey: string;
     filterableColumns: DataTableFilterableColumn<TData>[];
     /** Loads the list again. A promise keeps the button turning until it settles. */
@@ -27,7 +28,7 @@ interface DataTableToolbarProps<TData> {
 }
 
 /** Filter input, faceted filter chips, column visibility and refresh. */
-export function DataTableToolbar<TData>({
+export function DataTableToolbar<TData extends RowData>({
     table,
     searchKey,
     filterableColumns,
@@ -38,7 +39,7 @@ export function DataTableToolbar<TData>({
     toolbarStart,
     columnSettings,
 }: DataTableToolbarProps<TData>) {
-    const isFiltered = table.getState().columnFilters.length > 0;
+    const isFiltered = table.store.state.columnFilters.length > 0;
     const facetedFilters = filterableColumns.map((column) =>
         table.getColumn(column.id as string) ? (
             <DataTableFacetedFilter

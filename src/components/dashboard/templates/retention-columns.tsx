@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
 import { describeConfig, RETENTION_MODES, RETENTION_TIERS } from "@/components/templates/retention-words";
@@ -50,7 +50,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the retention policies. Name and actions stay put, the rest can move and hide. */
-export function retentionColumns({ onOpen, renderActions }: ColumnOptions): ColumnDef<RetentionRow>[] {
+export function retentionColumns({ onOpen, renderActions }: ColumnOptions): AppColumnDef<RetentionRow>[] {
     return [
         {
             accessorKey: "name",

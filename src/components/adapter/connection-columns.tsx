@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DateDisplay } from "@/components/utils/date-display";
 import { ADAPTER_DEFINITIONS } from "@/lib/adapters/definitions";
 import { formatBytes } from "@/lib/utils";
@@ -66,8 +66,8 @@ export function statusDetail(config: AdapterConfig, health: ConnectionHealth): s
  * The columns of one connection list. Name and actions stay put, everything in between
  * can be moved and switched off in the Columns menu, and some start switched off.
  */
-export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, withFrom = false, withShared = false }: ColumnOptions): ColumnDef<AdapterConfig>[] {
-    const name: ColumnDef<AdapterConfig> = {
+export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, withFrom = false, withShared = false }: ColumnOptions): AppColumnDef<AdapterConfig>[] {
+    const name: AppColumnDef<AdapterConfig> = {
         accessorKey: "name",
         header: "Name",
         meta: { pin: "start" },
@@ -82,13 +82,13 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
         ),
     };
     // Only here for the Type filter. The type is already shown under the name.
-    const type: ColumnDef<AdapterConfig> = {
+    const type: AppColumnDef<AdapterConfig> = {
         accessorKey: "adapterId",
         header: "Type",
         meta: { filterOnly: true },
         filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     };
-    const status: ColumnDef<AdapterConfig> = {
+    const status: AppColumnDef<AdapterConfig> = {
         id: "status",
         header: "Status",
         cell: ({ row }) => {
@@ -109,7 +109,7 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             );
         },
     };
-    const address: ColumnDef<AdapterConfig> = {
+    const address: AppColumnDef<AdapterConfig> = {
         id: "address",
         header: kind === "database" ? "Host" : kind === "notification" ? "Sends to" : "Location",
         cell: ({ row }) => {
@@ -121,14 +121,14 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
         },
     };
     // What a server holds: of an own one as many as its last read found, of a provided one what this tenant got.
-    const databases: ColumnDef<AdapterConfig> = {
+    const databases: AppColumnDef<AdapterConfig> = {
         id: "databases",
         header: "Databases",
         cell: ({ row }) => (row.original.sharedServer
             ? <SharedDatabasesCell terms={row.original.sharedServer} />
             : <ListedDatabasesCell listed={row.original.listedDatabases} />),
     };
-    const version: ColumnDef<AdapterConfig> = {
+    const version: AppColumnDef<AdapterConfig> = {
         id: "version",
         header: "Version",
         cell: ({ row }) => {
@@ -136,21 +136,21 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             return value ? <span className="text-sm tabular-nums">{value}</span> : <Muted>-</Muted>;
         },
     };
-    const usedBy: ColumnDef<AdapterConfig> = {
+    const usedBy: AppColumnDef<AdapterConfig> = {
         id: "usedBy",
         header: "Used by",
         cell: ({ row }) => (row.original.sharedServer
             ? <SharedBackedUpByCell terms={row.original.sharedServer} />
             : <UsedByCell usedBy={row.original.overview?.usedBy} />),
     };
-    const lastBackup: ColumnDef<AdapterConfig> = {
+    const lastBackup: AppColumnDef<AdapterConfig> = {
         id: "lastBackup",
         header: "Last backup",
         cell: ({ row }) => (row.original.sharedServer
             ? <SharedLastBackupCell terms={row.original.sharedServer} />
             : <LastRunCell run={row.original.overview ? row.original.overview.lastBackup : undefined} never="Never" />),
     };
-    const health = (defaultHidden: boolean): ColumnDef<AdapterConfig> => ({
+    const health = (defaultHidden: boolean): AppColumnDef<AdapterConfig> => ({
         id: "health",
         header: "Health, 24h",
         meta: { defaultHidden },
@@ -159,13 +159,13 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             return overview ? <HealthBars buckets={overview.health} passed={overview.checksPassed} airGapped={isAirGapped(row.original)} /> : <Muted>-</Muted>;
         },
     });
-    const credential: ColumnDef<AdapterConfig> = {
+    const credential: AppColumnDef<AdapterConfig> = {
         id: "credential",
         header: "Credential",
         meta: { defaultHidden: true },
         cell: ({ row }) => <CredentialCell name={row.original.overview?.credentialName} />,
     };
-    const ssh: ColumnDef<AdapterConfig> = {
+    const ssh: AppColumnDef<AdapterConfig> = {
         id: "ssh",
         header: "SSH tunnel",
         meta: { defaultHidden: true },
@@ -174,7 +174,7 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             return host ? <span className="block max-w-48 truncate text-sm" title={host}>{host}</span> : <Muted>-</Muted>;
         },
     };
-    const stored: ColumnDef<AdapterConfig> = {
+    const stored: AppColumnDef<AdapterConfig> = {
         id: "stored",
         header: "Stored",
         cell: ({ row }) => {
@@ -190,7 +190,7 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             );
         },
     };
-    const retention: ColumnDef<AdapterConfig> = {
+    const retention: AppColumnDef<AdapterConfig> = {
         id: "retention",
         header: "Default retention",
         meta: { defaultHidden: true },
@@ -199,30 +199,30 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, 
             return value ? <span className="block max-w-48 truncate text-sm" title={value}>{value}</span> : <Muted>-</Muted>;
         },
     };
-    const lastSent: ColumnDef<AdapterConfig> = {
+    const lastSent: AppColumnDef<AdapterConfig> = {
         id: "lastSent",
         header: "Last sent",
         cell: ({ row }) => <LastRunCell run={row.original.overview ? row.original.overview.lastSent : undefined} never="Never" />,
     };
-    const added: ColumnDef<AdapterConfig> = {
+    const added: AppColumnDef<AdapterConfig> = {
         accessorKey: "createdAt",
         header: "Added",
         meta: { defaultHidden: true },
         cell: ({ row }) => <span className="text-sm"><DateDisplay date={row.original.createdAt} format="P" /></span>,
     };
     // Whose a connection is, and filters by it: Yours, or the tenant that shares it.
-    const from: ColumnDef<AdapterConfig> = {
+    const from: AppColumnDef<AdapterConfig> = {
         id: "from",
         header: "From",
         accessorFn: (config) => providerOf(config) ?? "Yours",
         cell: ({ row }) => <FromCell config={row.original} />,
     };
-    const shared: ColumnDef<AdapterConfig> = {
+    const shared: AppColumnDef<AdapterConfig> = {
         id: "shared",
         header: "Shared with",
         cell: ({ row }) => <SharedWithCell config={row.original} />,
     };
-    const actions: ColumnDef<AdapterConfig> = {
+    const actions: AppColumnDef<AdapterConfig> = {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
         meta: { pin: "end", label: "Actions" },

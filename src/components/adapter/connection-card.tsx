@@ -1,6 +1,7 @@
 "use client";
 
-import { flexRender, type Row } from "@tanstack/react-table";
+import { flexRender } from "@tanstack/react-table";
+import type { AppRow } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { isPlainClick } from "@/components/ui/row-click";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,7 @@ const VALUES_SHOWN = 3;
 const BUCKETS = { ok: "bg-success", failed: "bg-warning", offline: "bg-destructive", none: "bg-muted" } as const;
 
 interface ConnectionCardProps {
-    row: Row<AdapterConfig>;
+    row: AppRow<AdapterConfig>;
     onOpen: (config: AdapterConfig) => void;
     /** The tenant of the connection, a small line under its type in All tenants. */
     tenantName?: string | null;

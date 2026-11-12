@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import type { DataTableFilterableColumn } from "@/components/ui/data-table-types";
 import type { SsoProviderRow, SsoTenant } from "@/services/sso/sso-providers-types";
 import { BelongsTo, DomainCell, LastSignInCell, LinkedFaces, LoginPageCell, NewPeopleCell, PlaceCell, ProviderCell, ProviderStateBadge } from "./sign-in-cells";
@@ -20,7 +20,7 @@ interface ColumnOptions {
     multiTenant: boolean;
 }
 
-type Column = ColumnDef<SsoProviderRow>;
+type Column = AppColumnDef<SsoProviderRow>;
 
 /**
  * The columns of the sign-in providers. Provider and actions stay put, the rest can move and hide.

@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { runAsTenant } from "@/lib/tenant/context";
 import { tenantScopeExtension } from "@/lib/tenant/prisma-scope";
 import { PERMISSIONS } from "@/lib/auth/permissions";
@@ -21,7 +22,8 @@ vi.mock("@/lib/logging/logger", () => ({
     logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }) },
 }));
 // The services use the client of the app, here the one of the test database with its tenant filter.
-vi.mock("@/lib/prisma", () => ({ get default() { return holder.client; } }));
+// better-auth reads the data model of the client when it starts, before a test made one.
+vi.mock("@/lib/prisma", () => ({ get default() { return holder.client ?? {}; } }));
 
 const { logViewOf, FULL_VIEW } = await import("@/services/audit/log-reach");
 const { listAudit, getAuditFacets, getAuditStats, getAuditWhoOptions } = await import("@/services/audit/audit-list-service");
@@ -75,7 +77,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     holder.client = base.$extends(tenantScopeExtension(async () => null));
 
     await base.tenant.create({ data: { id: "acme", name: "Acme" } });

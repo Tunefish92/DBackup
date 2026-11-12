@@ -1,7 +1,8 @@
 "use client";
 
+import type { RowData } from "@tanstack/react-table";
 import * as React from "react";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import type { TableDensity, TablePreferences } from "@/lib/core/table-preferences";
 import { useTableDefaults } from "./table-defaults";
 import {
@@ -27,8 +28,8 @@ export interface ColumnLayoutOption {
  * one of the profile is not kept, so the table follows the profile again. Returns null when the
  * table has no Columns menu.
  */
-export function useColumnLayout<TData, TValue>(
-    columns: ColumnDef<TData, TValue>[],
+export function useColumnLayout<TData extends RowData, TValue>(
+    columns: AppColumnDef<TData, TValue>[],
     option: ColumnLayoutOption | undefined,
     withSelect: boolean,
 ) {

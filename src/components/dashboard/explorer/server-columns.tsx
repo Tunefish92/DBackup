@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { kindNames } from "@/components/adapter/connection-columns";
 import { DestinationTile } from "@/components/dashboard/storage/explorer/explorer-cells";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -87,8 +87,8 @@ interface ColumnsInput {
 }
 
 /** The columns of the list of servers, with the engine only for its filter. */
-export function serverColumns({ coverage, backups, biggest, renderActions }: ColumnsInput): ColumnDef<ServerRow>[] {
-    const columns: ColumnDef<ServerRow>[] = [
+export function serverColumns({ coverage, backups, biggest, renderActions }: ColumnsInput): AppColumnDef<ServerRow>[] {
+    const columns: AppColumnDef<ServerRow>[] = [
         {
             id: "server",
             accessorFn: (row) => row.server.name,

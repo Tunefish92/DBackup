@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DataTable } from "@/components/ui/data-table";
 import { TableDefaultsProvider } from "@/components/ui/table-defaults";
 import type { TableDefaults, TablePreferences } from "@/lib/core/table-preferences";
@@ -12,7 +12,7 @@ interface Item {
 }
 
 const items: Item[] = Array.from({ length: 60 }, (_, index) => ({ id: `item-${index}`, name: `Item ${index}` }));
-const columns: ColumnDef<Item>[] = [
+const columns: AppColumnDef<Item>[] = [
     { accessorKey: "name", header: "Name" },
     { id: "size", header: "Size", cell: () => "1 MB" },
 ];

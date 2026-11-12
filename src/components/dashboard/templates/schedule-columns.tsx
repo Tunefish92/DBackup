@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { describeSchedule } from "@/components/dashboard/jobs/job-schedule";
 import { JobIcon } from "@/components/dashboard/storage/explorer/explorer-cells";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -39,7 +39,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the schedule presets. Name and actions stay put, the rest can move and hide. */
-export function scheduleColumns({ jobs, timezone, onOpen, renderActions }: ColumnOptions): ColumnDef<ScheduleRow>[] {
+export function scheduleColumns({ jobs, timezone, onOpen, renderActions }: ColumnOptions): AppColumnDef<ScheduleRow>[] {
     return [
         {
             accessorKey: "name",

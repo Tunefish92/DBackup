@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { ConflictError, ValidationError } from "@/lib/logging/errors";
 import { PERMISSIONS } from "@/lib/auth/permissions";
 import { runAsTenant } from "@/lib/tenant/context";
@@ -54,7 +55,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     app.client = base.$extends(tenantScopeExtension(async () => null));
 }, 120_000);
 

@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { tenantScopeExtension } from "@/lib/tenant/prisma-scope";
 
 const app = vi.hoisted(() => ({ client: undefined as unknown }));
@@ -45,7 +46,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     app.client = base.$extends(tenantScopeExtension(async () => null));
 
     for (const [id, name] of [["acme", "Acme"], ["globex", "Globex"]]) await base.tenant.create({ data: { id, name } });

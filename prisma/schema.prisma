@@ -2,9 +2,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// The database comes from DATABASE_URL, read by prisma.config.ts for the CLI and by
+// src/lib/prisma.ts for the app.
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model AdapterConfig {
@@ -713,6 +714,10 @@ model SsoProvider {
   defaultGroupId    String? // The group a user the provider creates starts in, none leaves them without a group
 
   userId String? // Optional: If linked to a specific user (Account Linking) logic, usually null for global SSO
+
+  // A column the SSO plugin of better-auth expects since 1.7 and checks before every request. It
+  // ties a provider to an organization of its organization plugin, which DBackup does not use.
+  organizationId String?
 
   // The tenant that brings this provider, null for one of the platform. A tenant's provider is
   // reached by the domain of an email, never as a button, and the people it adds join that tenant.

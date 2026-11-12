@@ -2,23 +2,17 @@
 
 import * as React from "react";
 import {
-    ColumnDef,
     ColumnFiltersState,
     RowSelectionState,
     SortingState,
-    VisibilityState,
+    ColumnVisibilityState,
     PaginationState,
     OnChangeFn,
     flexRender,
-    getCoreRowModel,
-    getFilteredRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    getFacetedRowModel,
-    getFacetedUniqueValues,
-    useReactTable,
-    type Row,
+    useTable,
+    type RowData,
 } from "@tanstack/react-table";
+import { appTableFeatures, type AppColumnDef, type AppRow } from "@/components/ui/table-features";
 
 import {
     Table,
@@ -48,12 +42,12 @@ export type { BulkAction, BulkRunOptions, BulkTrash, DataTableFilterableColumn, 
 /** Rows of skeletons while the first rows load, see `loadingRows`. */
 const LOADING_ROWS = 5;
 
-interface DataTableProps<TData, TValue> {
-    columns: ColumnDef<TData, TValue>[];
+interface DataTableProps<TData extends RowData, TValue> {
+    columns: AppColumnDef<TData, TValue>[];
     data: TData[];
     searchKey?: string;
     filterableColumns?: DataTableFilterableColumn<TData>[];
-    initialColumnVisibility?: VisibilityState;
+    initialColumnVisibility?: ColumnVisibilityState;
     autoResetPageIndex?: boolean;
     /** Loads the rows again. A promise keeps the refresh button turning until it settles. */
     onRefresh?: () => unknown;
@@ -106,7 +100,7 @@ interface DataTableProps<TData, TValue> {
      * A part of the card look between the toolbar and the rows, like a timeline that picks what the rows show.
      * As a function it gets every row that passes the search and the filters, so it can draw them itself.
      */
-    aboveRows?: React.ReactNode | ((rows: Row<TData>[]) => React.ReactNode);
+    aboveRows?: React.ReactNode | ((rows: AppRow<TData>[]) => React.ReactNode);
     /** Leaves out the rows and the pages of the card look, for a list that waits for a pick in `aboveRows`. */
     hideRows?: boolean;
     searchPlaceholder?: string;
@@ -123,7 +117,7 @@ interface DataTableProps<TData, TValue> {
      */
     view?: "table" | "cards" | "split";
     /** One card. Its cells come from `row.getVisibleCells()`, so the Columns menu decides what a card shows. */
-    renderCard?: (row: Row<TData>) => React.ReactNode;
+    renderCard?: (row: AppRow<TData>) => React.ReactNode;
     /** The columns of the card grid, for cards that need more room than the three abreast they get by default. */
     cardGridClassName?: string;
     /**
@@ -132,7 +126,7 @@ interface DataTableProps<TData, TValue> {
      */
     renderRowMenu?: (row: TData, bulk: RowMenuBulk<TData> | null) => React.ReactNode;
     /** The split view, given all rows that pass search and filters. It has no pages. */
-    renderSplit?: (rows: Row<TData>[]) => React.ReactNode;
+    renderSplit?: (rows: AppRow<TData>[]) => React.ReactNode;
 
     // Manual Pagination & Sorting Capabilities
     pageCount?: number;
@@ -148,7 +142,7 @@ interface DataTableProps<TData, TValue> {
     manualFiltering?: boolean;
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends RowData, TValue>({
     columns,
     data,
     searchKey = "name",
@@ -201,7 +195,7 @@ export function DataTable<TData, TValue>({
         pageIndex: 0,
         pageSize: columnLayout?.initial?.pageSize ?? defaults.pageSize,
     }));
-    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility);
+    const [columnVisibility, setColumnVisibility] = React.useState<ColumnVisibilityState>(initialColumnVisibility);
     const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
     // Resolution (Controlled vs Internal)
@@ -217,7 +211,7 @@ export function DataTable<TData, TValue>({
     // The select column is prepended here rather than by each consumer, so its position is
     // the same everywhere and permission gating stays a single boolean.
     const tableColumns = React.useMemo(
-        () => (enableRowSelection ? [selectColumn<TData>() as ColumnDef<TData, TValue>, ...columns] : columns),
+        () => (enableRowSelection ? [selectColumn<TData>() as AppColumnDef<TData, TValue>, ...columns] : columns),
         [enableRowSelection, columns]
     );
     const layout = useColumnLayout(columns, columnLayout, enableRowSelection);
@@ -230,9 +224,13 @@ export function DataTable<TData, TValue>({
         setPagination(next);
     };
 
-    const table = useReactTable({
+    const table = useTable({
+        // Sorting, filtering and the pages run in the browser unless the table is manual about them,
+        // then TanStack hands on the rows as they come, see appTableFeatures.
+        features: appTableFeatures,
         data,
-        columns: tableColumns,
+        // The table holds columns of every value type at once, which TanStack types as its default.
+        columns: tableColumns as AppColumnDef<TData>[],
         getRowId,
         meta: { density },
         enableRowSelection: enableRowSelection
@@ -263,13 +261,6 @@ export function DataTable<TData, TValue>({
 
         // When pagination is controlled externally, auto-reset would overwrite the parent's pageIndex on every data update.
         autoResetPageIndex: manualPagination ? false : autoResetPageIndex,
-        getCoreRowModel: getCoreRowModel(),
-        // Only use client-side models if NOT manual
-        getPaginationRowModel: !manualPagination ? getPaginationRowModel() : undefined,
-        getSortedRowModel: !manualSorting ? getSortedRowModel() : undefined,
-        getFilteredRowModel: !manualFiltering ? getFilteredRowModel() : undefined,
-        getFacetedRowModel: !manualFiltering ? getFacetedRowModel() : undefined,
-        getFacetedUniqueValues: !manualFiltering ? getFacetedUniqueValues() : undefined,
     });
 
     // TanStack keeps selection keys for rows that have left `data`. They are invisible in
@@ -315,7 +306,7 @@ export function DataTable<TData, TValue>({
     const bulkDialogs = hasBulk && bulk.dialogs;
 
     /** Wraps a row or a card in its right click menu, with the bulk context when it is one of several. */
-    const withRowMenu = (row: Row<TData>, element: React.ReactNode) => {
+    const withRowMenu = (row: AppRow<TData>, element: React.ReactNode) => {
         const many = hasBulk && selectedRows.length > 1 && row.getIsSelected();
         const menu = renderRowMenu?.(
             row.original,
@@ -458,7 +449,7 @@ export function DataTable<TData, TValue>({
         return (
             <div className="min-w-0 space-y-4">
                 <div className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", joined && JOIN_END)}>{toolbar}</div>
-                {renderSplit(table.getPrePaginationRowModel().rows)}
+                {renderSplit(table.getPrePaginatedRowModel().rows)}
                 {bulkDialogs}
             </div>
         );
@@ -505,7 +496,7 @@ export function DataTable<TData, TValue>({
                 {!aboveRows && toolbarNote}
                 {bulkBar}
             </div>
-            {aboveRows && <div className="border-t">{typeof aboveRows === "function" ? aboveRows(table.getPrePaginationRowModel().rows) : aboveRows}</div>}
+            {aboveRows && <div className="border-t">{typeof aboveRows === "function" ? aboveRows(table.getPrePaginatedRowModel().rows) : aboveRows}</div>}
             {!hideRows && (
                 <>
                     {/* With a part above the rows, their legend moves down to them. */}

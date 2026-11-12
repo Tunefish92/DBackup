@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ArrowRightLeft, Asterisk, Database, EyeOff, History, Lock, Tag, Undo2, Zap } from "lucide-react";
 import type { BackupActionGroup } from "@/components/dashboard/storage/explorer/backup-actions";
 import { BackupRowMenu } from "@/components/dashboard/storage/explorer/backup-menus";
@@ -107,7 +107,7 @@ function HowCell({ how, tenantName, ownerName, databaseName }: { how: How; tenan
 }
 
 /** The databases of the server with who sees each, how and how many backups each has kept. */
-export function assignmentColumns({ data, tenantName, canAssign, onChange, onHistory, onMove, onOnDemand, now }: ColumnOptions): ColumnDef<DatabaseOwnerRow>[] {
+export function assignmentColumns({ data, tenantName, canAssign, onChange, onHistory, onMove, onOnDemand, now }: ColumnOptions): AppColumnDef<DatabaseOwnerRow>[] {
     return [
         {
             accessorKey: "name",

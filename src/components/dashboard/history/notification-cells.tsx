@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { ExecutionStatusBadge } from "@/components/dashboard/widgets/execution-status";
 import { TenantLine } from "@/components/tenant/tenant-column";
@@ -28,7 +28,7 @@ export function EventChip({ eventType }: { eventType: string }) {
 }
 
 /** The columns of the notifications, with the channel and the event also as their filters. */
-export function notificationColumns(renderActions: (row: NotificationLogRow) => React.ReactNode): ColumnDef<NotificationLogRow>[] {
+export function notificationColumns(renderActions: (row: NotificationLogRow) => React.ReactNode): AppColumnDef<NotificationLogRow>[] {
     return [
         {
             id: "title",

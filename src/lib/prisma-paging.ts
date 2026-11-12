@@ -1,16 +1,18 @@
 import { Prisma } from '@prisma/client'
 
 /**
- * Prisma 6 on SQLite loads the rows of a relation for at most 999 parents in one statement and
- * splits a bigger read into several. When such a relation is ordered under a `select`, merging the
- * parts panics in the query engine ("no entry found for key", record.rs), so a `findMany` that reads
+ * Prisma on SQLite reads the rows of an ordered relation under a `select` with the ids of every
+ * parent in one statement. Prisma 6 split a read of more than 999 parents and panicked merging the
+ * parts ("no entry found for key", record.rs), Prisma 7 refuses it once the statement binds more
+ * than 999 values (P2029), which a read of 998 parents already does. So a `findMany` that reads
  * 1000 jobs with their ordered destinations or runs fails, which an instance with many tenants
- * reaches in All tenants. `relationOrderPaging` reads such a query in pages of 999 parents instead,
- * in the order it asked for with the id last, so the pages never overlap.
+ * reaches in All tenants. `relationOrderPaging` reads such a query in pages of 900 parents instead,
+ * which leaves room for the values of filters on the relation, in the order it asked for with the
+ * id last, so the pages never overlap.
  */
 
 /** The most parents a read with an ordered relation asks for at once. */
-export const RELATION_ORDER_PAGE = 999
+export const RELATION_ORDER_PAGE = 900
 
 type Args = Record<string, unknown>
 
@@ -61,7 +63,7 @@ export async function pagedByParents<T>(args: Args, run: (args: Args) => Promise
 /** The models with a field `id`, the only ones a page can order by it. */
 const WITH_ID = new Set(Prisma.dmmf.datamodel.models.filter((model) => model.fields.some((field) => field.name === 'id')).map((model) => model.name))
 
-/** Reads a `findMany` that orders a relation in pages of 999 parents, see the top of this file. */
+/** Reads a `findMany` that orders a relation in pages of 900 parents, see the top of this file. */
 export const relationOrderPaging = Prisma.defineExtension({
   name: 'relationOrderPaging',
   query: {

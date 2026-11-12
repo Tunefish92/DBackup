@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { UserAvatar } from "@/components/dashboard/users/user-cells";
 import type { DataTableFilterableColumn } from "@/components/ui/data-table";
 import type { ApiKeyRow } from "@/services/auth/api-keys-types";
@@ -13,7 +13,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the API keys. Key and actions stay put, the rest can move and hide. */
-export function apiKeyColumns({ onOpen, renderActions, now }: ColumnOptions): ColumnDef<ApiKeyRow>[] {
+export function apiKeyColumns({ onOpen, renderActions, now }: ColumnOptions): AppColumnDef<ApiKeyRow>[] {
     return [
         {
             accessorKey: "name",
@@ -41,7 +41,7 @@ export function apiKeyColumns({ onOpen, renderActions, now }: ColumnOptions): Co
             header: "Owner",
             accessorFn: (key) => key.owner.id,
             filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-            sortingFn: (a, b) => a.original.owner.name.localeCompare(b.original.owner.name),
+            sortFn: (a, b) => a.original.owner.name.localeCompare(b.original.owner.name),
             cell: ({ row }) => <div className="max-w-44"><OwnerCell apiKey={row.original} /></div>,
         },
         {

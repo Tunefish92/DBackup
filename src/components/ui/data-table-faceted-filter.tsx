@@ -1,6 +1,7 @@
+import type { RowData } from "@tanstack/react-table";
 import * as React from "react"
 import { Check, ChevronDown, ListFilter, X } from "lucide-react"
-import { Column } from "@tanstack/react-table"
+import type { AppColumn } from "@/components/ui/table-features";
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -21,8 +22,8 @@ import {
 import { toneAttribute } from "@/components/ui/tone"
 import type { DataTableFilterOption } from "./data-table-types"
 
-interface DataTableFacetedFilterProps<TData, TValue> {
-  column?: Column<TData, TValue>
+interface DataTableFacetedFilterProps<TData extends RowData, TValue> {
+  column?: AppColumn<TData, TValue>
   title?: string
   options: DataTableFilterOption[]
   contentClassName?: string
@@ -45,7 +46,7 @@ const BOX =
  * Each value shows how many rows it would leave. Values with a group are listed under its heading,
  * and the ones no row has under the other filters wait at the end, where they cannot be picked.
  */
-export function DataTableFacetedFilter<TData, TValue>({
+export function DataTableFacetedFilter<TData extends RowData, TValue>({
   column,
   title = "Filter",
   options,

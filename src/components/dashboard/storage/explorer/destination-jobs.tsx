@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { ColumnDef, SortingState } from "@tanstack/react-table";
+import type { SortingState } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { kindNames } from "@/components/adapter/connection-columns";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -41,7 +42,7 @@ interface DestinationJobsProps {
 export function DestinationJobs({ destination, entries, destinations, canDelete, onDelete }: DestinationJobsProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
 
-    const columns = useMemo<ColumnDef<DestinationJob>[]>(() => [
+    const columns = useMemo<AppColumnDef<DestinationJob>[]>(() => [
         {
             id: "job",
             accessorFn: (entry) => entry.job.name,
