@@ -16,6 +16,7 @@ DBackup supports a wide variety of database engines.
 | [MSSQL](/user-guide/sources/mssql) | 2017, 2019, 2022, Azure SQL Edge | `BACKUP DATABASE` | ✅ |
 | [Azure SQL Database](/user-guide/sources/azure-sql) (beta) | Single database, elastic pool | `SqlPackage` BACPAC export | ✅ (drops the target first) |
 | [Firebird](/user-guide/sources/firebird) (beta) | 3.x, 4.x, 5.x | `gbak` | ✅ (pre-configured aliases) |
+| [Oracle Database](/user-guide/sources/oracle) (beta) | 12.1 and later | Data Pump (`DBMS_DATAPUMP`) | ✅ (per schema) |
 
 ## Directory Sources
 
@@ -72,12 +73,12 @@ DBackup supports two connection modes for most database types:
 
 In SSH mode, DBackup connects to the remote server via SSH and executes database CLI tools (e.g., `mariadb-dump`, `pg_dump`) **directly on that server**. The output comes back over the same connection, streamed or as a temporary file DBackup fetches and deletes, depending on the tool. This is **not** an SSH tunnel - the database tools run remotely. The form marks **Over SSH** as beta.
 
-**Supported adapters:** MySQL, MariaDB, PostgreSQL, MongoDB, Redis, Valkey, SQLite, Firebird, MSSQL
+**Supported adapters:** MySQL, MariaDB, PostgreSQL, MongoDB, Redis, Valkey, SQLite, Firebird, MSSQL, Oracle
 
 ::: warning Required: Database CLI Tools on Remote Host
 When using SSH mode, the required database client tools **must be installed on the remote SSH server**. DBackup does not transfer or install any tools - it only executes them. See the individual adapter pages for the specific tools required.
 
-[MSSQL](/user-guide/sources/mssql) is the exception and needs no tools installed: SQL Server writes the backup itself through a T-SQL command, so SSH mode tunnels that connection instead of running anything remotely. It is the only adapter that works this way.
+[MSSQL](/user-guide/sources/mssql) and [Oracle](/user-guide/sources/oracle) are the exceptions and need no tools installed. The server writes the backup itself, through a T-SQL command or Data Pump, so SSH mode tunnels the database connection instead of running anything remotely.
 :::
 
 ### SSH Configuration Fields

@@ -34,6 +34,8 @@ import azureIcon from "@iconify-icons/logos/azure";
 import mssqlIcon from "@iconify-icons/simple-icons/microsoftsqlserver";
 import minioIcon from "@iconify-icons/simple-icons/minio";
 import hetznerIcon from "@iconify-icons/simple-icons/hetzner";
+// logos:oracle is the wide wordmark, which turns into a thin line in a square slot.
+import oracleIcon from "@iconify-icons/simple-icons/oracle";
 
 // - Inline bundled icons (no npm package available; data fetched from Iconify API) -
 const valkeyIcon: IconifyIcon = {
@@ -78,6 +80,7 @@ const ADAPTER_ICON_MAP: Record<string, IconifyIcon> = {
     // logos:azure is multi-colour, so no ADAPTER_COLOR_MAP entry is needed.
     "azure-sql": azureIcon,
     "firebird": firebirdIcon,
+    "oracle": oracleIcon,
 
     // Storage - Local
     "local-filesystem": harddiskIcon,
@@ -124,6 +127,7 @@ export function getAdapterIcon(adapterId: string): IconifyIcon {
 // (logos:* icons already have colors embedded in their SVGs)
 const ADAPTER_COLOR_MAP: Record<string, string> = {
     "mssql": "#CC2927",
+    "oracle": "#F80000",
     "s3-generic": "#C72E49",
     "s3-hetzner": "#D50C2D",
 };

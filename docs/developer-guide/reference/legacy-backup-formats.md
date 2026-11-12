@@ -35,11 +35,11 @@ Do not search for the word "legacy" alone. It also names unrelated things, such 
 This can be done at any time, it changes nothing for existing backups.
 
 - [ ] Remove `dump()` from `DatabaseAdapter` in `src/lib/core/interfaces.ts` and from the adapter registrations in each `index.ts`.
-- [ ] Delete `dump()` in `mysql`, `postgres`, `mongodb`, `firebird`, `mssql` and `azure-sql`, including the multi-database branches and the MSSQL TAR packer. Keep any per-database helper `dumpOne()` still calls.
+- [ ] Delete `dump()` in `mysql`, `postgres`, `mongodb`, `firebird`, `mssql`, `azure-sql` and `oracle`, including the multi-database branches and the MSSQL TAR packer. Oracle never wrote the older formats, its `dump()` only wraps `dumpOne()`. Keep any per-database helper `dumpOne()` still calls.
 - [ ] Move the body of `dump()` into `dumpOne()` for `sqlite` and `redis`, which currently wrap it.
 - [ ] Remove the whole-file compression and encryption in `src/lib/runner/steps/03-upload.ts`, together with the `compression`, `encryption` and `multiDb` fields it writes into the metadata sidecar. The `isSeekableArchive` guard then has nothing left to guard.
 - [ ] `createMultiDbTar()` and `TarFileEntry` stay until stage 2, because the tests for the reader build their fixtures with them. Move them into a test helper if stage 2 is far off.
-- [ ] Rewrite or delete the tests that call `dump()`: `tests/unit/adapters/database/{mysql,postgres,mongodb,azure-sql,redis,sqlite}/dump.test.ts`, `tests/unit/adapters/mssql/dump.test.ts`, `tests/unit/adapters/database/firebird.test.ts`, and the `.gz` and `.enc` cases in `tests/unit/runner/steps/03-upload.test.ts`.
+- [ ] Rewrite or delete the tests that call `dump()`: `tests/unit/adapters/database/{mysql,postgres,mongodb,azure-sql,redis,sqlite}/dump.test.ts`, `tests/unit/adapters/mssql/dump.test.ts`, `tests/unit/adapters/database/firebird.test.ts`, the `dump()` case of `tests/unit/adapters/database/oracle/oracle.test.ts`, and the `.gz` and `.enc` cases in `tests/unit/runner/steps/03-upload.test.ts`.
 - [ ] Update `docs/developer-guide/adapters/database.md` and `src/lib/adapters/CLAUDE.md`, which still describe `dump()` as part of the interface.
 
 ## Stage 2: the reader
@@ -47,7 +47,7 @@ This can be done at any time, it changes nothing for existing backups.
 DBackup cannot tell whether anyone still holds a backup in an older format. Retention eventually deletes them from a destination, but locked backups, long retention policies and copies taken elsewhere can keep them around for years. Removing the reader turns those backups into files only the Recovery Kit can open, so it needs a release with a breaking change note that tells users to restore or re-create what they still need first.
 
 - [ ] Restore pipeline: in `src/services/restore/pipeline.ts`, reject a backup without an `archive` block instead of downloading, decrypting and decompressing it. The metadata fields and the extension fallback marked there go too.
-- [ ] Adapters: remove `restore()` from `DatabaseAdapter`. Delete it in `mysql`, `postgres`, `mongodb`, `firebird`, `mssql` and `azure-sql`, and move its body into `restoreOne()` for `sqlite` and `redis`, which currently wrap it.
+- [ ] Adapters: remove `restore()` from `DatabaseAdapter`. Delete it in `mysql`, `postgres`, `mongodb`, `firebird`, `mssql`, `azure-sql` and `oracle` (whose `restore()` only wraps `restoreOne()`), and move its body into `restoreOne()` for `sqlite` and `redis`, which currently wrap it.
 - [ ] Analysis: remove `analyzeDump` from the interface and every `analyze.ts` (plus `analyzeDump` in `azure-sql/restore.ts`), and the metadata shortcuts and download fallback in `src/app/api/storage/[id]/analyze/route.ts`. Keep that route's fallback to the embedded index of a seekable archive whose sidecar is missing.
 - [ ] TAR utilities: move `createTempDir`, `cleanupTempDir`, `shouldRestoreDatabase` and `getTargetDatabaseName` out of `common/tar-utils.ts`, then delete `common/tar-utils.ts` and `common/types.ts`.
 - [ ] Metadata: remove `multiDb` from `BackupMetadata`.

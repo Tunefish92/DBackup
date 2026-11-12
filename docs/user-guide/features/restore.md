@@ -193,6 +193,13 @@ gbak -rep -user sysdba -password *** backup.fbk database.fdb
 - On a server that gives databases to customers, a target that is no saved alias asks for the same confirmation as a database a customer holds, since a path can still reach a customer's file under another name
 - See [Firebird source](/user-guide/sources/firebird) for alias configuration
 
+### Oracle Database
+
+- Each schema is restored with a Data Pump import, under its own name or a new one
+- Tables that exist are replaced, other objects that exist are kept and reported as warnings
+- A new schema name typed in lower case becomes upper case, and Oracle's own schemas are refused as targets
+- See [Oracle source](/user-guide/sources/oracle) for privileges and the directory object
+
 ### Redis and Valkey
 
 - Redis reads a dump only while it starts, so DBackup cannot restore it over the network

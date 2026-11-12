@@ -177,7 +177,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [ui, postgres, mysql, mongodb, mssql, small, customer, storage]
+        family: [ui, postgres, mysql, mongodb, mssql, oracle, small, customer, storage]
     env:
       CI: "true"
       E2E_FAMILIES: ${{ matrix.family }}

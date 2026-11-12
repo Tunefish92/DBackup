@@ -5,7 +5,8 @@ describe("database dump settings for the seekable archive", () => {
     it("refuses to guess the dump format of an adapter it does not know", () => {
         expect(dumpFormatFor("postgres")).toBe("custom");
         expect(dumpFormatFor("valkey")).toBe("rdb");
-        expect(() => dumpFormatFor("oracle")).toThrow(/No dump format is defined/);
+        expect(dumpFormatFor("oracle")).toBe("dmp");
+        expect(() => dumpFormatFor("db2")).toThrow(/No dump format is defined/);
     });
 
     it("stores dumps the engine already compressed as they are", () => {

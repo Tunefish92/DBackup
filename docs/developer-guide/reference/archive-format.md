@@ -69,7 +69,7 @@ Encrypted archives use opaque names on purpose. TAR headers are not encrypted, s
 paths there would publish the file listing next to the encrypted data and make the sealed
 index pointless.
 
-`<ext>` is `sql`, `dump` (PostgreSQL custom format), `archive` (MongoDB), `bak` (MSSQL), `bacpac` (Azure SQL Database), `fbk` (Firebird), `rdb` (Redis and Valkey) or `sqlite` (SQLite).
+`<ext>` is `sql`, `dump` (PostgreSQL custom format), `archive` (MongoDB), `bak` (MSSQL), `bacpac` (Azure SQL Database), `dmp` (Oracle Data Pump), `fbk` (Firebird), `rdb` (Redis and Valkey) or `sqlite` (SQLite).
 
 `<name>` is the database name with `/`, `\`, NUL and control characters replaced by `_`, and a leading `.` replaced by `_` as well. A Firebird alias such as `/data/shop.fdb` therefore becomes one flat member, and a name like `../x` can never climb out of the folder `tar -xf` extracts into. The index keeps the real name. Readers take the member name from the index `e` line rather than rebuilding it.
 

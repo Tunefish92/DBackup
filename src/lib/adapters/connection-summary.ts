@@ -36,6 +36,8 @@ export function connectionAddress(adapterId: string, configJson: string): string
         case "azure-sql":
         case "mongodb":
             return hostPort;
+        case "oracle":
+            return config.serviceName ? `${hostPort}/${text(config.serviceName)}` : hostPort;
         case "redis":
         case "valkey":
             return `${hostPort}, DB ${text(config.database ?? 0)}`;

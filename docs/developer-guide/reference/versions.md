@@ -14,6 +14,7 @@ This document lists the database engines and versions supported by DBackup.
 | **Microsoft SQL Server** | 2017, 2019, 2022 | `mssql` npm | T-SQL commands |
 | **Azure SQL Database** | Single database, elastic pool | `sqlpackage` | Beta, BACPAC export |
 | **Firebird** | 3.x, 4.x, 5.x | `gbak` | Beta, alias-based database list |
+| **Oracle Database** | 12.1 and later | `oracledb` npm (Thin mode) | Beta, Data Pump per schema |
 
 ## Docker Container Tools
 
@@ -241,6 +242,23 @@ Uses `gbak`/`isql` for backup, restore, and version detection. Unlike other adap
 ```bash
 gbak -b -user sysdba -password *** database.fdb backup.fbk
 ```
+
+## Oracle Database
+
+### Supported Versions
+
+- Oracle Database 12.1 and later, which the Thin mode of node-oracledb requires
+- Enterprise, Standard Edition 2, Express (XE) and Free
+
+::: info Beta
+The Oracle adapter is marked as Beta in the source type picker. The dev lab runs 21c XE and 23ai Free.
+:::
+
+### Implementation
+
+No client tool. The adapter runs Data Pump through `DBMS_DATAPUMP` in PL/SQL over a node-oracledb connection, one schema per job, and moves the dump between the directory object on the server and DBackup over the same connection: a `BFILE` to read it, `UTL_FILE` to write it. Over SSH the SQL*Net connection is tunnelled like the TDS connection of MSSQL.
+
+The version comes from the server's own version string, like `23.6.0.24.10`. Data Pump reads dumps of older versions, so the usual guard against restoring a newer backup onto an older server applies unchanged.
 
 ## Dialect System
 

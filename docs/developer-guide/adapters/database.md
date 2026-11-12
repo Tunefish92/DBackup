@@ -15,6 +15,7 @@ Database adapters handle the dump and restore operations for different database 
 | Azure SQL Database | `azure-sql` | `sqlpackage` | ❌ (public PaaS endpoint) | `bacpac` |
 | Redis | `redis` | `redis-cli` | ✅ | `rdb` |
 | Firebird | `firebird` | `gbak`, `isql` | ✅ | `fbk` |
+| Oracle Database | `oracle` | None (Data Pump over SQL*Net) | ✅ (SQL*Net tunnelled) | `dmp` |
 
 ## Backup Format
 
@@ -32,6 +33,7 @@ Each adapter declares the format of its dump in `DB_FORMAT_BY_ADAPTER` in `src/l
 | `rdb` | `.rdb` | Redis, Valkey | |
 | `sqlite` | `.sqlite` | SQLite | |
 | `fbk` | `.fbk` | Firebird | |
+| `dmp` | `.dmp` | Oracle Database | |
 
 "Stored as-is" means the dump is already compressed, so the job's compression is not applied to it again.
 
@@ -125,6 +127,7 @@ Each database adapter can optionally return size and table count information. Th
 | **MongoDB** | Native `sizeOnDisk` from `listDatabases` command | `listCollections().length` per database |
 | **MSSQL** | `sys.master_files` (`SUM(size) * 8 * 1024`) | `COUNT(*)` from `INFORMATION_SCHEMA.TABLES` |
 | **Azure SQL Database** | `sys.database_files` (`SUM(size) * 8 * 1024`, data files only), one connection per database | `COUNT(*)` from `sys.tables`, same connection |
+| **Oracle Database** | `DBA_SEGMENTS` (`SUM(bytes)` per owner), none without the DBA views | `COUNT(*)` from `DBA_TABLES`, `ALL_TABLES` without the DBA views |
 | **SQLite** | Not supported | Not supported |
 | **Redis** | Not supported | Not supported |
 
@@ -160,7 +163,7 @@ If `getDatabasesWithStats()` is not implemented, falls back to `getDatabases()` 
 
 An adapter describes **what** runs. An `ExecutionHost` decides **how** and **where** it runs. Adapters have exactly one code path, and `direct`, `ssh` (and later an agent) are interchangeable implementations behind it.
 
-In SSH mode this is **not** a tunnel for the database protocol: `mysqldump` and friends execute on the remote host and their stdout is streamed back. The one exception is MSSQL, described below.
+In SSH mode this is **not** a tunnel for the database protocol: `mysqldump` and friends execute on the remote host and their stdout is streamed back. The exceptions are MSSQL and Oracle, described below.
 
 ### The `ExecutionHost` interface
 
@@ -285,6 +288,12 @@ MSSQL is the exception, because a `.bak` file must live on the SQL Server host. 
 | `undefined` / `"direct"` | `"local"` | direct | direct (shared mount) |
 
 Row 2 is served by `CompositeHost`, a decorator that delegates execution to a `DirectHost` and file operations to an `SshHost`. Row 1 opens a local TCP listener on port 0 and pipes it through `forwardOut`. All connection pools go through `withPool()`, which sets `options.serverName` to the real hostname so certificate validation still passes through the tunnel, and caps `pool.max` because every pooled TDS connection is its own SSH channel.
+
+### Oracle: SQL*Net through an SSH tunnel
+
+Oracle needs no tool on any host. `withConnection()` in `oracle/connection.ts` asks the host for `forwardPort()` and hands the address it gets to node-oracledb in Thin mode, so direct and SSH differ only in the port the driver dials. Data Pump writes the dump into a directory object on the server, and `oracle/files.ts` moves it over the same connection, reading through a `BFILE` and writing through `UTL_FILE`. That is why a managed service without SSH access works as well.
+
+Every connection goes through `withConnection()`. A lint guard rejects `oracledb.getConnection` anywhere else, for the same reason as `withPool()`. TLS through a tunnel is refused rather than unchecked, since the certificate would be compared against `127.0.0.1`.
 
 ### Testing
 

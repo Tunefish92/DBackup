@@ -31,6 +31,7 @@ const JOBS: JobSpec[] = [
     { name: "Lab SQL Server 2022 to FTP", source: "mssql-2022", destinations: ["ftp"] },
     { name: "Lab Redis 8 to SMB", source: "redis-8", destinations: ["smb"], notify: ["webhook"] },
     { name: "Lab Firebird 5 to Rsync", source: "firebird-5", destinations: ["rsync"] },
+    { name: "Lab Oracle 23 to Local", source: "oracle-23", destinations: ["local"], encrypted: true },
     { name: "Lab PostgreSQL 12 over SSH to Local", source: "postgres-12-ssh", destinations: ["local"] },
     { name: "Lab SQLite to Local", source: "sqlite", destinations: ["local"] },
     { name: "Lab Files incremental to Local", source: "files", destinations: ["local"], incremental: true },

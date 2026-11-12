@@ -19,7 +19,7 @@ export type CompressionKind = "GZIP" | "BROTLI";
  * On-disk format of a database dump entry. Part of the format contract: a value written here
  * is read back by every DBackup version and by the Recovery Kit, so values are only ever added.
  */
-export type DumpFormat = "sql" | "custom" | "archive" | "bak" | "fbk" | "bacpac" | "rdb" | "sqlite";
+export type DumpFormat = "sql" | "custom" | "archive" | "bak" | "fbk" | "bacpac" | "dmp" | "rdb" | "sqlite";
 
 // ── Manifest (cleartext, no user data) ────────────────────────────────────
 

@@ -17,7 +17,7 @@ export interface RestoreFailure {
 }
 
 /** The login a server usually has for creating databases, as the first guess of the form. */
-const ADMIN_USERS: Record<string, string> = { postgres: "postgres", mssql: "sa", "azure-sql": "sa", mongodb: "admin" };
+const ADMIN_USERS: Record<string, string> = { postgres: "postgres", mssql: "sa", "azure-sql": "sa", mongodb: "admin", oracle: "system" };
 
 interface Options {
     file: FileInfo | null;

@@ -38,6 +38,14 @@ x-firebird-health: &firebird-health
   timeout: 5s
   retries: 20
   start_period: 20s
+# Oracle opens its pluggable database a while after the container starts, so the check asks the
+# service LABPDB itself rather than the instance.
+x-oracle-health: &oracle-health
+  test: ["CMD-SHELL", "echo \"SELECT 'LAB_READY' FROM dual;\" | sqlplus -s -L system/LabPassword1@//localhost:1521/LABPDB | grep -q LAB_READY"]
+  interval: 10s
+  timeout: 10s
+  retries: 60
+  start_period: 60s
 x-mysql-env: &mysql-env
   MYSQL_ROOT_PASSWORD: rootpassword
 x-postgres-env: &postgres-env
@@ -54,6 +62,11 @@ x-mssql-env: &mssql-env
 x-firebird-env: &firebird-env
   FIREBIRD_ROOT_PASSWORD: masterkey
   FIREBIRD_DATABASE: shop.fdb
+# One pluggable database of the same name on every version, so the sources need no per-version
+# service name. FREEPDB1 and XEPDB1 stay as the images make them.
+x-oracle-env: &oracle-env
+  ORACLE_PASSWORD: LabPassword1
+  ORACLE_DATABASE: LABPDB
 
 services:
   # ── MySQL ───────────────────────────────────────────────
@@ -344,6 +357,31 @@ services:
     volumes: [firebird-5:/var/lib/firebird/data]
     healthcheck: *firebird-health
 
+  # ── Oracle ──────────────────────────────────────────────
+  # Both only in "full": each image is more than a gigabyte and the server wants about 2 GB of
+  # memory. XE 21 exists for amd64 only.
+  oracle-21:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    restart: unless-stopped
+    platform: linux/amd64
+    profiles: ["full"]
+    environment: *oracle-env
+    ports: ["15521:1521"]
+    volumes: [oracle-21:/opt/oracle/oradata]
+    # Oracle 21 takes the folder of a pluggable database under DATA_PUMP_DIR for missing while a
+    # directory reports one link, which btrfs does, tries to create it again and fails every query
+    # of a directory object with ORA-48189. A tmpfs reports the links like ext4.
+    tmpfs: ["/opt/oracle/admin/XE/dpdump:uid=54321,gid=54321,mode=0750"]
+    healthcheck: *oracle-health
+  oracle-23:
+    image: gvenzl/oracle-free:23-slim-faststart
+    restart: unless-stopped
+    profiles: ["full"]
+    environment: *oracle-env
+    ports: ["15523:1521"]
+    volumes: [oracle-23:/opt/oracle/oradata]
+    healthcheck: *oracle-health
+
 volumes:
   mysql-57:
   mysql-80:
@@ -375,3 +413,5 @@ volumes:
   firebird-3:
   firebird-4:
   firebird-5:
+  oracle-21:
+  oracle-23:

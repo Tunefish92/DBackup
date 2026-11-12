@@ -25,7 +25,7 @@ export function sshToolOf(adapterId: string): string | undefined {
  */
 const OPTION_KEYS = [
     "authenticationDatabase", "mode", "sentinelMasterName", "sentinelNodes", "database",
-    "firebirdBinaryPath", "requestTimeout", "options", "singleTransaction", "routines", "events",
+    "firebirdBinaryPath", "directory", "requestTimeout", "options", "singleTransaction", "consistent", "routines", "events",
     "tls", "disableSsl", "encrypt", "trustServerCertificate",
 ];
 
@@ -36,7 +36,7 @@ const REDIS_IDS = new Set(["redis", "valkey"]);
  * backs up are picked in the job, and `uri` is MongoDB's retired connection string.
  */
 const NOT_OPTIONS = new Set([
-    "host", "port", "connectionMode", "sshHost", "sshPort", ...PREFIXED_SSH_KEYS,
+    "host", "port", "serviceName", "connectionMode", "sshHost", "sshPort", ...PREFIXED_SSH_KEYS,
     "databases", "database", "uri", "backupPath", "fileTransferMode", "localBackupPath",
 ]);
 
@@ -63,8 +63,20 @@ function optionKeys(adapter: AdapterDefinition, config: Record<string, unknown>)
     return [...keys, ...unlisted];
 }
 
+/**
+ * Adapters that talk to their server over its own protocol through the SSH connection, instead
+ * of running a tool on the SSH server.
+ */
+const TUNNELLED: Record<string, string> = { mssql: "SQL Server", oracle: "Oracle" };
+
+/** The engine an adapter reaches through an SSH tunnel, or undefined when it runs a tool there. */
+export function tunnelledEngineOf(adapterId: string): string | undefined {
+    return TUNNELLED[adapterId];
+}
+
 function sshDescription(adapterId: string): string {
-    if (adapterId === "mssql") return "DBackup logs in here and reaches SQL Server through it. The backup file comes back the same way.";
+    const tunnelled = tunnelledEngineOf(adapterId);
+    if (tunnelled) return `DBackup logs in here and reaches ${tunnelled} through it. The backup file comes back the same way.`;
     return `DBackup logs in here and runs ${sshToolOf(adapterId) ?? "the backup"} on this machine.`;
 }
 
@@ -109,6 +121,8 @@ export function databaseLayout(adapter: AdapterDefinition, config: Record<string
     const mode = hasMode ? config.connectionMode : "direct";
     const login = adapter.credentials?.primary ? [LOGIN_KEY] : [];
     const expectedLogin = loginRequired(adapter) ? [LOGIN_KEY] : [];
+    // Oracle names the database it connects to by its service, beside host and port.
+    const service = "serviceName" in shape ? ["serviceName"] : [];
 
     const connection: SectionLayout = {
         id: "connection",
@@ -118,8 +132,8 @@ export function databaseLayout(adapter: AdapterDefinition, config: Record<string
     };
     if (mode === "direct") {
         connection.description = "Where the database runs and how DBackup logs in.";
-        connection.keys.push("host", "port", ...login);
-        connection.expects.push("host", "port", ...expectedLogin);
+        connection.keys.push("host", "port", ...service, ...login);
+        connection.expects.push("host", "port", ...service, ...expectedLogin);
     } else {
         connection.description = "What to call it and how DBackup reaches it.";
     }
@@ -129,7 +143,7 @@ export function databaseLayout(adapter: AdapterDefinition, config: Record<string
     if (mode === "ssh") {
         sections.push(
             { id: "ssh", label: "SSH server", description: sshDescription(adapter.id), keys: ["sshHost", "sshPort", SSH_LOGIN_KEY], expects: ["sshHost", SSH_LOGIN_KEY] },
-            { id: "database", label: "Database", description: "As seen from the SSH server, usually 127.0.0.1.", keys: ["host", "port", ...login], expects: ["host", "port", ...expectedLogin] },
+            { id: "database", label: "Database", description: "As seen from the SSH server, usually 127.0.0.1.", keys: ["host", "port", ...service, ...login], expects: ["host", "port", ...service, ...expectedLogin] },
         );
     }
 

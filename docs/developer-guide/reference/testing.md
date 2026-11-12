@@ -85,11 +85,12 @@ DBackup runs as the service `app` of `lab/compose/e2e.yml`, in the Compose proje
 | `mysql` | MySQL 5.7 and 9, MariaDB 10.4 and 11.8, and 5.7 and 10.4 over SSH |
 | `mongodb` | MongoDB 4.4 and 8.0 |
 | `mssql` | SQL Server 2017 and 2022 |
+| `oracle` | Oracle 21c XE and 23ai Free, which the lab only starts with `--full` |
 | `small` | Redis 6 and 8, Valkey 7.2 and 8, Firebird 3 and 5, SQLite over SSH, and a folder |
 | `customer` | PostgreSQL, MySQL, Redis and SQLite of a server with the packages of Ubuntu, over its OpenSSH, with the fallback to `mysqldump` |
 | `storage` | One backup to every destination, each listing it, restoring it and deleting it, and a test message on every notification channel |
 
-Every database passes Test connection, is backed up encrypted and compressed, restored under a new name on its own server and read back with the tools of its engine, outside of DBackup: the output of `mysqldump` and `pg_dump`, `dbHash` of MongoDB, row counts and checksums of SQL Server, `isql` for Firebird and `.dump` of SQLite. Redis and Valkey restore by hand, so only their backups are checked. A bug the tests found that is not fixed yet is marked with `test.fail()`, so its test passes while it still fails and turns red once the bug is gone.
+Every database passes Test connection, is backed up encrypted and compressed, restored under a new name on its own server and read back with the tools of its engine, outside of DBackup: the output of `mysqldump` and `pg_dump`, `dbHash` of MongoDB, row counts and checksums of SQL Server, `sqlplus` for Oracle, `isql` for Firebird and `.dump` of SQLite. Redis and Valkey restore by hand, so only their backups are checked. A bug the tests found that is not fixed yet is marked with `test.fail()`, so its test passes while it still fails and turns red once the bug is gone.
 
 `E2E_NO_BUILD=1` uses an image built already, `E2E_KEEP=1` leaves DBackup and the restored databases in place, and `E2E_PORT` moves DBackup off port 3300. A service that does not start on a CPU without AVX, like MongoDB 8 in a virtual machine with a generic CPU model, skips its tests on a developer machine and fails them in CI. A failed test keeps its trace, screenshot and video under `e2e/test-results/`, and `e2e/playwright-report/` shows the report.
 

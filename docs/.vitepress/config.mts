@@ -111,7 +111,8 @@ export default defineConfig({
             { text: 'SQLite', link: '/user-guide/sources/sqlite' },
             { text: 'Microsoft SQL Server', link: '/user-guide/sources/mssql' },
             { text: 'Azure SQL Database', link: '/user-guide/sources/azure-sql' },
-            { text: 'Firebird', link: '/user-guide/sources/firebird' }
+            { text: 'Firebird', link: '/user-guide/sources/firebird' },
+            { text: 'Oracle Database', link: '/user-guide/sources/oracle' }
           ]
         },
         {

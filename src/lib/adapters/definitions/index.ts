@@ -4,7 +4,7 @@ import { DEFAULT_S3_UPLOAD_TUNING, type AdapterDefinition } from "./shared";
 import { STORAGE_ROLES } from "@/lib/core/storage-roles";
 import {
     MySQLSchema, MariaDBSchema, PostgresSchema, MongoDBSchema,
-    SQLiteSchema, MSSQLSchema, AzureSQLSchema, RedisSchema, FirebirdSchema,
+    SQLiteSchema, MSSQLSchema, AzureSQLSchema, RedisSchema, FirebirdSchema, OracleSchema,
 } from "./database";
 import {
     LocalStorageSchema, S3GenericSchema, S3AWSSchema, S3R2Schema, S3HetznerSchema,
@@ -33,6 +33,7 @@ export const ADAPTER_DEFINITIONS: AdapterDefinition[] = [
     { id: "redis", type: "database", group: "Key value", name: "Redis", sharesSingleDatabases: false, configSchema: RedisSchema },
     { id: "valkey", type: "database", group: "Key value", name: "Valkey", sharesSingleDatabases: false, configSchema: RedisSchema },
     { id: "firebird", type: "database", group: "Relational", name: "Firebird", beta: true, sharesSingleDatabases: true, customerRestores: false, configSchema: FirebirdSchema },
+    { id: "oracle", type: "database", group: "Relational", name: "Oracle Database", beta: true, sharesSingleDatabases: true, customerRestores: false, configSchema: OracleSchema },
 
     { id: "local-filesystem", type: "storage", group: "Local", name: "Local Filesystem", configSchema: LocalStorageSchema },
     {
