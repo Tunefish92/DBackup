@@ -4,7 +4,7 @@ import { DEFAULT_S3_UPLOAD_TUNING, type AdapterDefinition } from "./shared";
 import { STORAGE_ROLES } from "@/lib/core/storage-roles";
 import {
     MySQLSchema, MariaDBSchema, PostgresSchema, MongoDBSchema,
-    SQLiteSchema, MSSQLSchema, AzureSQLSchema, RedisSchema, FirebirdSchema,
+    SQLiteSchema, MSSQLSchema, AzureSQLSchema, RedisSchema, FirebirdSchema, OracleSchema,
 } from "./database";
 import {
     LocalStorageSchema, S3GenericSchema, S3AWSSchema, S3R2Schema, S3HetznerSchema,
@@ -23,16 +23,17 @@ export * from "./storage";
 export * from "./notification";
 
 export const ADAPTER_DEFINITIONS: AdapterDefinition[] = [
-    { id: "mysql", type: "database", group: "Relational", name: "MySQL", configSchema: MySQLSchema },
-    { id: "mariadb", type: "database", group: "Relational", name: "MariaDB", configSchema: MariaDBSchema },
-    { id: "postgres", type: "database", group: "Relational", name: "PostgreSQL", configSchema: PostgresSchema },
-    { id: "mongodb", type: "database", group: "Document", name: "MongoDB", configSchema: MongoDBSchema },
-    { id: "sqlite", type: "database", group: "File based", name: "SQLite", configSchema: SQLiteSchema },
-    { id: "mssql", type: "database", group: "Relational", name: "Microsoft SQL Server", configSchema: MSSQLSchema },
-    { id: "azure-sql", type: "database", group: "Relational", name: "Azure SQL Database", beta: true, configSchema: AzureSQLSchema },
-    { id: "redis", type: "database", group: "Key value", name: "Redis", configSchema: RedisSchema },
-    { id: "valkey", type: "database", group: "Key value", name: "Valkey", configSchema: RedisSchema },
-    { id: "firebird", type: "database", group: "Relational", name: "Firebird", beta: true, configSchema: FirebirdSchema },
+    { id: "mysql", type: "database", group: "Relational", name: "MySQL", sharesSingleDatabases: true, configSchema: MySQLSchema },
+    { id: "mariadb", type: "database", group: "Relational", name: "MariaDB", sharesSingleDatabases: true, configSchema: MariaDBSchema },
+    { id: "postgres", type: "database", group: "Relational", name: "PostgreSQL", sharesSingleDatabases: true, configSchema: PostgresSchema },
+    { id: "mongodb", type: "database", group: "Document", name: "MongoDB", sharesSingleDatabases: true, configSchema: MongoDBSchema },
+    { id: "sqlite", type: "database", group: "File based", name: "SQLite", sharesSingleDatabases: true, configSchema: SQLiteSchema },
+    { id: "mssql", type: "database", group: "Relational", name: "Microsoft SQL Server", sharesSingleDatabases: true, configSchema: MSSQLSchema },
+    { id: "azure-sql", type: "database", group: "Relational", name: "Azure SQL Database", beta: true, sharesSingleDatabases: true, customerRestores: false, configSchema: AzureSQLSchema },
+    { id: "redis", type: "database", group: "Key value", name: "Redis", sharesSingleDatabases: false, configSchema: RedisSchema },
+    { id: "valkey", type: "database", group: "Key value", name: "Valkey", sharesSingleDatabases: false, configSchema: RedisSchema },
+    { id: "firebird", type: "database", group: "Relational", name: "Firebird", beta: true, sharesSingleDatabases: true, customerRestores: false, configSchema: FirebirdSchema },
+    { id: "oracle", type: "database", group: "Relational", name: "Oracle Database", beta: true, sharesSingleDatabases: true, customerRestores: false, configSchema: OracleSchema },
 
     { id: "local-filesystem", type: "storage", group: "Local", name: "Local Filesystem", configSchema: LocalStorageSchema },
     {
@@ -161,4 +162,21 @@ for (const def of ADAPTER_DEFINITIONS) {
 
 export function getAdapterDefinition(id: string) {
     return ADAPTER_DEFINITIONS.find(d => d.id === id);
+}
+
+/**
+ * Whether a database of a server of this engine can be given to a customer alone, see
+ * `AdapterDefinition.sharesSingleDatabases`. An engine nobody knows shares nothing.
+ */
+export function sharesSingleDatabases(adapterId: string): boolean {
+    const definition = getAdapterDefinition(adapterId);
+    return definition?.type === "database" && definition.sharesSingleDatabases === true;
+}
+
+/**
+ * Whether a customer may restore a database of a server of this engine that was given to them,
+ * see `AdapterDefinition.customerRestores`. Only an engine that shares single databases does.
+ */
+export function customerRestores(adapterId: string): boolean {
+    return sharesSingleDatabases(adapterId) && getAdapterDefinition(adapterId)?.customerRestores !== false;
 }

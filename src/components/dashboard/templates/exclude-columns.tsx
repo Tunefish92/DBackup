@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { JobIcon } from "@/components/dashboard/storage/explorer/explorer-cells";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -40,7 +40,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the exclude presets. Name and actions stay put, the rest can move and hide. */
-export function excludeColumns({ onOpen, renderActions }: ColumnOptions): ColumnDef<ExcludeRow>[] {
+export function excludeColumns({ onOpen, renderActions }: ColumnOptions): AppColumnDef<ExcludeRow>[] {
     return [
         {
             accessorKey: "name",

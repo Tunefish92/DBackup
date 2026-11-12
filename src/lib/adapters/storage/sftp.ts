@@ -6,9 +6,14 @@ import {
     ListTreeOptions,
     ListTreeResult,
     PrunedDirectory,
+    StorageReadOptions,
+    UploadOptions,
 } from "@/lib/core/interfaces";
 import { normalizeSshPrivateKey } from "@/lib/transport/pkcs8-compat";
 import { createConnectionPool } from "@/lib/adapters/storage/common/connection-pool";
+import { relativeToPrefix } from "@/lib/adapters/storage/common/prefix";
+import { createListingGuard, descendableName, listedNameProblem, ListingTooLargeError } from "@/lib/adapters/storage/common/listing-limits";
+import { assertReadSize, collectCapped, isFileTooLarge, readLimitOf, textOf } from "@/lib/adapters/storage/common/read-limit";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import { canPruneDirectory } from "@/lib/exclude-patterns";
 import { SFTPSchema } from "@/lib/adapters/definitions";
@@ -18,6 +23,10 @@ import path from "path";
 import { LogLevel, LogType } from "@/lib/core/logs";
 import { logger } from "@/lib/logging/logger";
 import { wrapError } from "@/lib/logging/errors";
+import { checkedSocket } from "@/lib/network/checked-socket";
+import { reachOf } from "@/lib/network/reach-policy";
+import { restoreFolderOf } from "@/lib/adapters/storage/common/restore-folder";
+import { putReplacing } from "@/lib/adapters/storage/sftp-write";
 
 const log = logger.child({ adapter: "sftp" });
 
@@ -87,7 +96,11 @@ export const connectSFTP = async (config: SFTPConfig, onDisconnect?: (reason: st
         end: () => onDisconnect?.('the connection ended'),
         close: () => onDisconnect?.('the connection closed'),
     });
+    // For a tenant that blocks the local network ssh2 gets a socket to a checked address, see `checked-socket.ts`.
+    const reach = reachOf(config);
+    const sock = reach ? await checkedSocket(config.host, config.port || 22, reach.allowed) : undefined;
     await sftp.connect({
+        ...(sock ? { sock } : {}),
         host: config.host,
         port: config.port,
         username: config.username,
@@ -331,6 +344,58 @@ async function ensureRemoteDir(
     }
 }
 
+/**
+ * Creates the folders of a write of a restore, refusing one below the folder of the restore that is
+ * no folder, or a symbolic link the server resolves to a place outside the folder. SFTP joins paths
+ * as text and the server follows every link on the way, so a link an earlier restore laid there, like
+ * `x -> ..`, would lead this write or link out of the folder, into the files of another job. A write
+ * follows a link that stays inside, like a subfolder moved within it, as `local.ts` does. A link of the
+ * restore is laid below no link at all, since its target counts from where its path says. Links above
+ * the folder are the setup of the server and are followed as before, see `ensureRemoteDir`. Each
+ * folder is checked once per session.
+ */
+async function ensureRestoreDir(
+    sftp: Client,
+    config: SFTPConfig,
+    remotePath: string,
+    relativePath: string,
+    dirCache: Set<string>,
+    followInside: boolean,
+    onLog?: (msg: string, level?: LogLevel, type?: LogType, details?: string) => void
+): Promise<void> {
+    const folder = restoreFolderOf(remotePath, relativePath);
+    let current = (config.pathPrefix ? path.posix.join(config.pathPrefix, folder) : folder) || ".";
+    if (!dirCache.has(current)) {
+        await ensureRemoteDir(sftp, current, config.pathPrefix, onLog);
+        dirCache.add(current);
+    }
+    const root = current;
+    let realRoot: string | undefined;
+    for (const part of path.posix.dirname(relativePath.replace(/\\/g, '/')).split('/')) {
+        if (part === "" || part === ".") continue;
+        current = path.posix.join(current, part);
+        // Apart from the plain entries, which say only that a folder exists.
+        const checked = `restore:${current}`;
+        if (dirCache.has(checked)) continue;
+        const kind = await sftp.exists(current);
+        if (kind === false) {
+            if (onLog) onLog(`Creating remote directory: ${current}`, 'info', 'storage');
+            await mkdirIdempotent(sftp, current);
+        } else if (kind === 'l' && followInside) {
+            realRoot ??= await sftp.realPath(root);
+            const target = await sftp.realPath(current).catch(() => undefined);
+            const below = target === undefined ? '..' : path.posix.relative(realRoot, target);
+            const inside = below !== '..' && !below.startsWith('../') && !path.posix.isAbsolute(below) && await sftp.exists(target!) === 'd';
+            if (!inside) {
+                throw new Error(`Refusing to restore below ${current}: it is a symbolic link out of the folder of the restore.`);
+            }
+        } else if (kind !== 'd') {
+            throw new Error(`Refusing to restore below ${current}: it is ${kind === 'l' ? 'a symbolic link' : 'no folder'}, which could lead the write out of the folder of the restore.`);
+        }
+        dirCache.add(checked);
+    }
+}
+
 /** Performs a single download on an already-connected SFTP client. */
 async function performSftpDownload(
     sftp: Client,
@@ -380,7 +445,8 @@ async function performSftpUpload(
     remotePath: string,
     onProgress: ((percent: number) => void) | undefined,
     onLog: ((msg: string, level?: LogLevel, type?: LogType, details?: string) => void) | undefined,
-    dirCache: Set<string>
+    dirCache: Set<string>,
+    options?: UploadOptions
 ): Promise<boolean> {
     try {
         const destination = config.pathPrefix
@@ -388,7 +454,9 @@ async function performSftpUpload(
             : remotePath;
 
         const remoteDir = path.posix.dirname(destination);
-        if (!dirCache.has(remoteDir)) {
+        if (options?.restoreRelativePath !== undefined) {
+            await ensureRestoreDir(sftp, config, remotePath, options.restoreRelativePath, dirCache, true, onLog);
+        } else if (!dirCache.has(remoteDir)) {
             await ensureRemoteDir(sftp, remoteDir, config.pathPrefix, onLog);
             dirCache.add(remoteDir);
         }
@@ -397,7 +465,8 @@ async function performSftpUpload(
 
         // The transfer already knows the size and hands it to every step callback, so asking the
         // filesystem for it separately would only add a stat per file for a number we are given.
-        await sftp.fastPut(localPath, destination, {
+        // Never written through an entry already at the name, see `sftp-write.ts`.
+        await putReplacing(sftp, localPath, destination, {
             ...TRANSFER_TUNING,
             step: (transferred: number, _chunk: number, total: number) => {
                 if (onProgress && total > 0) onProgress(Math.round((transferred / total) * 100));
@@ -515,7 +584,9 @@ async function walkSftpTree(
         };
 
         // One level at a time. Every directory of a level is read concurrently, and the
-        // directories they reveal become the next level.
+        // directories they reveal become the next level. Every entry passes the guard first, so a
+        // tree of any size or a name of any length stops the walk, see `listing-limits.ts`.
+        const guard = createListingGuard();
         let frontier: string[] = [""];
 
         while (frontier.length > 0) {
@@ -528,11 +599,15 @@ async function walkSftpTree(
 
                 for (const item of items) {
                     const childRel = relDir ? `${relDir}/${item.name}` : item.name;
+                    guard.add(childRel);
                     // Same convention as list(): relative to the adapter's configured root,
                     // not to the queried directory - the caller strips the rest.
                     const fullPath = path.posix.join(currentDir, item.name);
 
                     if (item.type === 'd') {
+                        // A name of dots alone or with a slash would read this folder or one above
+                        // it again, see `descendableName`.
+                        if (!descendableName(item.name)) continue;
                         const pattern = canPruneDirectory(childRel, options?.excludePatterns);
                         if (pattern) {
                             pruned.push({ path: childRel, pattern });
@@ -550,6 +625,8 @@ async function walkSftpTree(
                             unsupportedSymlinks.push(childRel);
                             continue;
                         }
+                        const targetProblem = listedNameProblem(target);
+                        if (targetProblem) throw new ListingTooLargeError(targetProblem);
                         files.push({
                             name: item.name,
                             path: toAdapterPath(fullPath),
@@ -588,6 +665,31 @@ async function walkSftpTree(
         throw error;
     } finally {
         await pool.close();
+    }
+}
+
+/**
+ * The bytes of a file, at most the limit of the read, see `read-limit.ts`. The stream asks for one
+ * byte past the limit and no more, so a file that grows while it is read still stops there. Null
+ * when the file is not there.
+ */
+async function readCappedBytes(config: SFTPConfig, remotePath: string, options?: StorageReadOptions): Promise<Buffer | null> {
+    const limit = readLimitOf(options);
+    let sftp: Client | null = null;
+    try {
+        sftp = await connectSFTP(config);
+        const source = config.pathPrefix
+            ? path.posix.join(config.pathPrefix, remotePath)
+            : remotePath;
+        assertReadSize((await sftp.stat(source)).size, limit);
+        // `end` is inclusive, so this reads at most `limit + 1` bytes.
+        return await collectCapped(sftp.createReadStream(source, { start: 0, end: limit }) as NodeJS.ReadableStream, limit);
+    } catch (error) {
+        if (isFileTooLarge(error)) throw error;
+        // Quietly fail if file not found (expected for missing .meta.json)
+        return null;
+    } finally {
+        if (sftp) await endSftpClient(sftp);
     }
 }
 
@@ -667,21 +769,21 @@ export const SFTPAdapter: StorageAdapter = {
         const dirCache = new Set<string>();
 
         return {
-            upload: (localPath, remotePath, onProgress, uploadLog) =>
+            upload: (localPath, remotePath, onProgress, uploadLog, uploadOptions) =>
                 pool.withConnection(({ client }) =>
-                    performSftpUpload(client, config, localPath, remotePath, onProgress, uploadLog ?? onLog, dirCache)),
+                    performSftpUpload(client, config, localPath, remotePath, onProgress, uploadLog ?? onLog, dirCache, uploadOptions)),
             download: (remotePath, localPath, onProgress) =>
                 pool.withConnection(({ client }) => performSftpDownload(client, config, remotePath, localPath, onProgress)),
             close: () => pool.close(),
         };
     },
 
-    async upload(config: SFTPConfig, localPath: string, remotePath: string, onProgress?: (percent: number) => void, onLog?: (msg: string, level?: LogLevel, type?: LogType, details?: string) => void): Promise<boolean> {
+    async upload(config: SFTPConfig, localPath: string, remotePath: string, onProgress?: (percent: number) => void, onLog?: (msg: string, level?: LogLevel, type?: LogType, details?: string) => void, options?: UploadOptions): Promise<boolean> {
         let sftp: Client | null = null;
         try {
             sftp = await connectSFTP(config);
             if (onLog) onLog(`Connected to SFTP ${config.host}:${config.port}`, 'info', 'storage');
-            return await performSftpUpload(sftp, config, localPath, remotePath, onProgress, onLog, new Set());
+            return await performSftpUpload(sftp, config, localPath, remotePath, onProgress, onLog, new Set(), options);
         } catch (error: unknown) {
             log.error("SFTP upload failed", { host: config.host, remotePath }, wrapError(error));
             if (onLog && error instanceof Error) onLog(`SFTP upload failed: ${error.message}`, 'error', 'storage', error.stack);
@@ -695,7 +797,7 @@ export const SFTPAdapter: StorageAdapter = {
         return walkSftpTree(config, dir, options);
     },
 
-    async createSymlink(config: SFTPConfig, remotePath: string, target: string): Promise<void> {
+    async createSymlink(config: SFTPConfig, remotePath: string, target: string, options?: Pick<UploadOptions, "restoreRelativePath">): Promise<void> {
         let sftp: Client | null = null;
         try {
             sftp = await connectSFTP(config);
@@ -704,7 +806,13 @@ export const SFTPAdapter: StorageAdapter = {
             const linkPath = prefix ? path.posix.join(prefix, remotePath) : remotePath;
 
             const parent = path.posix.dirname(linkPath);
-            if (parent && parent !== '.' && parent !== '/') await sftp.mkdir(parent, true);
+            // A link of a restore lies in a real folder of the restore, so the `..` at the start of its
+            // target climbs from where `linkLeavesTarget` counted, see `ensureRestoreDir`.
+            if (options?.restoreRelativePath !== undefined) {
+                await ensureRestoreDir(sftp, config, remotePath, options.restoreRelativePath, new Set(), false);
+            } else if (parent && parent !== '.' && parent !== '/') {
+                await sftp.mkdir(parent, true);
+            }
 
             const raw = rawSftp(sftp);
             if (!raw?.symlink) {
@@ -742,6 +850,10 @@ export const SFTPAdapter: StorageAdapter = {
                 : (dir || ".");
 
             const files: FileInfo[] = [];
+            // Every entry passes the guard as it arrives, and the walk goes down only into a folder
+            // of a plain name, so a server that lists `..` or `a/..` as a folder ends, see
+            // `listing-limits.ts`.
+            const guard = createListingGuard();
 
             // Helper for recursive listing
             const walk = async (currentDir: string) => {
@@ -749,21 +861,15 @@ export const SFTPAdapter: StorageAdapter = {
 
                 for (const item of items) {
                     const fullPath = path.posix.join(currentDir, item.name);
+                    guard.add(fullPath);
 
                     if (item.type === 'd') {
-                        await walk(fullPath);
+                        if (descendableName(item.name)) await walk(fullPath);
                     } else if (item.type === '-') {
                         // Calculate UI-friendly relative path
                         // e.g. /home/user/backups/Job1/file.sql -> Job1/file.sql (if prefix is /home/user/backups)
-                        let relativePath = fullPath;
-
-                        // Strip the prefix part to make it relative to the "root" of the adapter
-                        if (prefix && fullPath.startsWith(prefix)) {
-                            relativePath = fullPath.substring(prefix.length);
-                        }
-
-                        // Remove leading slash
-                        if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+                        // The prefix is compared as the join above writes it, so /home/user//backups/ strips too.
+                        const relativePath = relativeToPrefix(fullPath, prefix);
 
                         files.push({
                             name: item.name,
@@ -854,29 +960,11 @@ export const SFTPAdapter: StorageAdapter = {
         }
     },
 
-    async read(config: SFTPConfig, remotePath: string): Promise<string | null> {
-        let sftp: Client | null = null;
-        try {
-            sftp = await connectSFTP(config);
-
-            const source = config.pathPrefix
-                ? path.posix.join(config.pathPrefix, remotePath)
-                : remotePath;
-
-            // get returns Buffer or string depending on options/destination
-            // passing undefined as dst makes it return a buffer
-            const buffer = await sftp.get(source);
-            if (buffer instanceof Buffer) {
-                return buffer.toString('utf-8');
-            }
-            return null;
-        } catch (_error) {
-            // Quietly fail if file not found (expected for missing .meta.json)
-            return null;
-        } finally {
-            if (sftp) await endSftpClient(sftp);
-        }
+    async read(config: SFTPConfig, remotePath: string, options?: StorageReadOptions): Promise<string | null> {
+        return textOf(await readCappedBytes(config, remotePath, options));
     },
+
+    readBytes: readCappedBytes,
 
     async delete(config: SFTPConfig, remotePath: string): Promise<boolean> {
         let sftp: Client | null = null;
@@ -891,6 +979,24 @@ export const SFTPAdapter: StorageAdapter = {
             return true;
         } catch (error) {
             log.error("SFTP delete failed", { host: config.host, remotePath }, wrapError(error));
+            return false;
+        } finally {
+            if (sftp) await endSftpClient(sftp);
+        }
+    },
+
+    async deleteEmptyFolder(config: SFTPConfig, remotePath: string): Promise<boolean> {
+        // The folder the destination is set to stays, whatever is in it.
+        if (path.posix.normalize(`/${remotePath}`) === "/") return false;
+        let sftp: Client | null = null;
+        try {
+            sftp = await connectSFTP(config);
+            const target = config.pathPrefix ? path.posix.join(config.pathPrefix, remotePath) : remotePath;
+            // Not recursive, so the server refuses a folder that holds anything.
+            await sftp.rmdir(target, false);
+            return true;
+        } catch (error) {
+            log.debug("SFTP folder not removed", { host: config.host, remotePath, reason: wrapError(error).message });
             return false;
         } finally {
             if (sftp) await endSftpClient(sftp);

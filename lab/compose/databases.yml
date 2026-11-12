@@ -7,8 +7,10 @@
 # No bind mounts except the MSSQL backup folder, so the file runs unchanged on a remote Docker
 # host through a docker context. Credentials are test values and live in the catalog as well.
 
+# Over TCP: the first start of a volume runs a server for its init scripts on the socket alone and
+# then restarts it, so a ping on the socket passes before the server that stays is up.
 x-mysql-health: &mysql-health
-  test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+  test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpassword"]
   interval: 5s
   timeout: 20s
   retries: 20
@@ -38,6 +40,14 @@ x-firebird-health: &firebird-health
   timeout: 5s
   retries: 20
   start_period: 20s
+# Oracle opens its pluggable database a while after the container starts, so the check asks the
+# service LABPDB itself rather than the instance.
+x-oracle-health: &oracle-health
+  test: ["CMD-SHELL", "echo \"SELECT 'LAB_READY' FROM dual;\" | sqlplus -s -L system/LabPassword1@//localhost:1521/LABPDB | grep -q LAB_READY"]
+  interval: 10s
+  timeout: 10s
+  retries: 60
+  start_period: 60s
 x-mysql-env: &mysql-env
   MYSQL_ROOT_PASSWORD: rootpassword
 x-postgres-env: &postgres-env
@@ -54,6 +64,11 @@ x-mssql-env: &mssql-env
 x-firebird-env: &firebird-env
   FIREBIRD_ROOT_PASSWORD: masterkey
   FIREBIRD_DATABASE: shop.fdb
+# One pluggable database of the same name on every version, so the sources need no per-version
+# service name. FREEPDB1 and XEPDB1 stay as the images make them.
+x-oracle-env: &oracle-env
+  ORACLE_PASSWORD: LabPassword1
+  ORACLE_DATABASE: LABPDB
 
 services:
   # ── MySQL ───────────────────────────────────────────────
@@ -90,6 +105,15 @@ services:
     environment: *mysql-env
     ports: ["33390:3306"]
     volumes: [mysql-9:/var/lib/mysql]
+    healthcheck: *mysql-health
+  # The first version the MariaDB dump tool takes for MariaDB 10.3 or later.
+  mysql-26:
+    image: mysql:26
+    restart: unless-stopped
+    profiles: ["core"]
+    environment: *mysql-env
+    ports: ["33326:3306"]
+    volumes: [mysql-26:/var/lib/mysql]
     healthcheck: *mysql-health
 
   # ── MariaDB ─────────────────────────────────────────────
@@ -344,11 +368,37 @@ services:
     volumes: [firebird-5:/var/lib/firebird/data]
     healthcheck: *firebird-health
 
+  # ── Oracle ──────────────────────────────────────────────
+  # Both only in "full": each image is more than a gigabyte and the server wants about 2 GB of
+  # memory. XE 21 exists for amd64 only.
+  oracle-21:
+    image: gvenzl/oracle-xe:21-slim-faststart
+    restart: unless-stopped
+    platform: linux/amd64
+    profiles: ["full"]
+    environment: *oracle-env
+    ports: ["15521:1521"]
+    volumes: [oracle-21:/opt/oracle/oradata]
+    # Oracle 21 takes the folder of a pluggable database under DATA_PUMP_DIR for missing while a
+    # directory reports one link, which btrfs does, tries to create it again and fails every query
+    # of a directory object with ORA-48189. A tmpfs reports the links like ext4.
+    tmpfs: ["/opt/oracle/admin/XE/dpdump:uid=54321,gid=54321,mode=0750"]
+    healthcheck: *oracle-health
+  oracle-23:
+    image: gvenzl/oracle-free:23-slim-faststart
+    restart: unless-stopped
+    profiles: ["full"]
+    environment: *oracle-env
+    ports: ["15523:1521"]
+    volumes: [oracle-23:/opt/oracle/oradata]
+    healthcheck: *oracle-health
+
 volumes:
   mysql-57:
   mysql-80:
   mysql-84:
   mysql-9:
+  mysql-26:
   mariadb-104:
   mariadb-1011:
   mariadb-114:
@@ -375,3 +425,5 @@ volumes:
   firebird-3:
   firebird-4:
   firebird-5:
+  oracle-21:
+  oracle-23:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type MutableRefObject } from "react";
+import { useCallback, useRef, useState, type MutableRefObject } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { FileInfo } from "@/components/dashboard/storage/file-info";
@@ -17,7 +17,7 @@ export interface RestoreFailure {
 }
 
 /** The login a server usually has for creating databases, as the first guess of the form. */
-const ADMIN_USERS: Record<string, string> = { postgres: "postgres", mssql: "sa", "azure-sql": "sa", mongodb: "admin" };
+const ADMIN_USERS: Record<string, string> = { postgres: "postgres", mssql: "sa", "azure-sql": "sa", mongodb: "admin", oracle: "system" };
 
 interface Options {
     file: FileInfo | null;
@@ -45,9 +45,12 @@ export function useRestoreStart(options: Options) {
     const [failure, setFailure] = useState<RestoreFailure | null>(null);
     const [adminUser, setAdminUser] = useState(ADMIN_USERS[sourceType.toLowerCase()] ?? "root");
     const [adminPassword, setAdminPassword] = useState("");
+    // What the confirmation answered about the databases of customers, kept for a retry with an admin login.
+    const overwriteCustomers = useRef(false);
 
-    const start = useCallback(async (withAdmin = false) => {
+    const start = useCallback(async (withAdmin = false, overwriteCustomerDatabases?: boolean) => {
         if (!file) return;
+        if (overwriteCustomerDatabases !== undefined) overwriteCustomers.current = overwriteCustomerDatabases;
         setRestoring(true);
         try {
             const payload = {
@@ -68,6 +71,8 @@ export function useRestoreStart(options: Options) {
                     : undefined,
                 ...(excludePatterns.length > 0 ? { excludePatterns } : {}),
                 privilegedAuth: withAdmin ? { user: adminUser, password: adminPassword } : undefined,
+                // Databases customers hold on a shared server, which the confirmation asked about.
+                ...(overwriteCustomers.current ? { overwriteCustomerDatabases: true } : {}),
                 // The run happens in the background with nobody to ask, so the key travels with it.
                 ...keyOverrideRef.current,
             };

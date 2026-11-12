@@ -55,7 +55,7 @@ export async function renderNotificationEmail(payload: NotificationPayload, bran
     // Loaded when a mail is sent, so react-dom/server never lands in the graph of a page.
     const { renderToStaticMarkup } = await import("react-dom/server");
     const body = renderToStaticMarkup(<NotificationEmail payload={payload} brand={brand} />);
-    const subject = payload.title;
+    const subject = payload.subject ?? payload.title;
     const html = [
         "<!DOCTYPE html>",
         '<html lang="en"><head>',

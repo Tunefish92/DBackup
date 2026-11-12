@@ -4,7 +4,7 @@
  * `E2E_FAMILIES=postgres,mysql` narrows a run to those families, `ui` names the browser tests.
  */
 
-import { CUSTOMER, NOTIFY, STORAGE, databasesOf, type DatabaseService } from "../../lab/src/catalog";
+import { CUSTOMER, DATABASES, NOTIFY, STORAGE, databasesOf, type DatabaseService } from "../../lab/src/catalog";
 import type { LabConfig, SshLogin } from "../../lab/src/config";
 import { ENGINES, engineOf } from "../../lab/src/engines";
 import { sqliteDatabase } from "../../lab/src/engines/sqlite";
@@ -61,6 +61,15 @@ const containers = (engines: Engine[], sshTwins: string[] = []): Target[] => {
     return [...databases.map((database) => container(database)), ...databases.filter((database) => sshTwins.includes(database.service)).map((database) => container(database, true))];
 };
 
+/**
+ * Oracle runs only in the profile "full", each server wants about 2 GB of memory, so its family
+ * takes the containers of every profile, and the ones of `sshTwins` once more over SSH.
+ */
+const allContainers = (engines: Engine[], sshTwins: string[] = []): Target[] => {
+    const databases = DATABASES.filter((database) => engines.includes(database.engine));
+    return [...databases.map((database) => container(database)), ...databases.filter((database) => sshTwins.includes(database.service)).map((database) => container(database, true))];
+};
+
 const FIREBIRD_3 = "The gbak of Firebird 5, which the image ships, restores into a Firebird 3 server only over the service manager. Over a client connection it fails with a BLR syntax error.";
 
 /** SQLite in the SSH host of the lab, over SSH. */
@@ -111,6 +120,7 @@ export const FAMILIES: Family[] = [
     { name: "mysql", targets: containers(["mysql", "mariadb"], ["mysql-57", "mariadb-104"]) },
     { name: "mongodb", targets: containers(["mongodb"]) },
     { name: "mssql", targets: containers(["mssql"]) },
+    { name: "oracle", targets: allContainers(["oracle"], ["oracle-23"]) },
     {
         name: "small",
         targets: [
@@ -147,5 +157,5 @@ export function uiSelected(): boolean {
     return !names?.length || names.includes("ui");
 }
 
-/** The UI tests back up one database, PostgreSQL 18. */
-export const UI_SERVICES = ["postgres-18"];
+/** The UI tests back up one database, PostgreSQL 18, and read the mail of a shared channel in Mailpit. */
+export const UI_SERVICES = ["postgres-18", NOTIFY.mailpit.service];

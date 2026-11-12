@@ -5,11 +5,12 @@ import type { AdapterDefinition } from "@/lib/adapters/definitions";
 import { ConfigField, ConfigSwitches, HostPortFields, LoginField, NameField, isBooleanSchema } from "./connection-form-fields";
 import type { SectionId } from "./connection-form-layout";
 import { ModeChoice, type ModeOption } from "./connection-mode-choice";
-import { sshToolOf } from "./database-form-layout";
+import { sshToolOf, tunnelledEngineOf } from "./database-form-layout";
 import { FirebirdAliasFields } from "./firebird-alias-fields";
 import { RedisDatabaseSelect } from "./redis-database-select";
 import { SwitchList, SwitchRow } from "./setting-switches";
 import { SshTestButton } from "./ssh-test-button";
+import { PLATFORM_ADMIN_ONLY, useMayReachServer } from "./host-local-access";
 import type { ConnectionSectionProps } from "./use-connection-form";
 
 /** Names that read better than the ones made from the keys. */
@@ -23,11 +24,15 @@ const LABELS: Record<string, string> = {
     backupPath: "Backup folder on the server",
     localBackupPath: "The same folder on this machine",
     sqliteBinaryPath: "sqlite3 binary",
+    serviceName: "Service name",
+    directory: "Directory object",
 };
 
 const DESCRIPTIONS: Record<string, string> = {
     mode: "A single server, or a Sentinel group that points to the current master.",
     localBackupPath: "The server's backup folder as it is mounted here, for example as a Docker volume or an NFS share.",
+    serviceName: "The service of the database or pluggable database, like FREEPDB1 or ORCLPDB1.",
+    directory: "Where Data Pump writes the dump on the server. The login needs READ and WRITE on it, and it needs room for the largest schema.",
 };
 
 /** Booleans of the database schemas, as sentences that are true when the switch is on. */
@@ -41,6 +46,10 @@ const SWITCHES: Record<string, { title: string; description: string }> = {
         description: "Backs them up too. The login needs SHOW_ROUTINE on MySQL 8.0.20 and later, or SELECT on mysql.proc.",
     },
     events: { title: "Events", description: "Backs up the scheduled events too. The login needs the EVENT privilege." },
+    consistent: {
+        title: "Consistent export",
+        description: "Exports every table of a schema as of the moment the export starts. Off, each table is read at its own moment, which avoids ORA-01555 on very long exports.",
+    },
     tls: { title: "TLS", description: "Encrypt the connection to the server." },
     disableSsl: { title: "Disable SSL", description: "For development databases with a self-signed certificate." },
     encrypt: { title: "Encrypt the connection", description: "Required by Azure SQL and most hosted servers." },
@@ -51,15 +60,19 @@ function Field(props: { adapter: AdapterDefinition; fieldKey: string; label?: st
     return <ConfigField {...props} label={props.label ?? LABELS[props.fieldKey]} description={props.description ?? DESCRIPTIONS[props.fieldKey]} />;
 }
 
-function modeOptions(adapter: AdapterDefinition): ModeOption[] {
+/** What a card that reaches the server DBackup runs on carries for someone who may not pick it. */
+const adminOnly = (mayReachServer: boolean): Partial<ModeOption> => (mayReachServer ? {} : { disabled: true, badge: PLATFORM_ADMIN_ONLY });
+
+function modeOptions(adapter: AdapterDefinition, mayReachServer: boolean): ModeOption[] {
     if (adapter.id === "sqlite") {
         return [
-            { value: "local", title: "This machine", description: "The file is on the machine DBackup runs on." },
+            { value: "local", title: "This machine", description: "The file is on the machine DBackup runs on.", ...adminOnly(mayReachServer) },
             { value: "ssh", title: "Over SSH", description: "The file is on a server DBackup logs into.", beta: true },
         ];
     }
-    const overSsh = adapter.id === "mssql"
-        ? "DBackup reaches SQL Server through a server it logs into."
+    const tunnelled = tunnelledEngineOf(adapter.id);
+    const overSsh = tunnelled
+        ? `DBackup reaches ${tunnelled} through a server it logs into.`
         : `DBackup logs into the server and runs ${sshToolOf(adapter.id) ?? "the backup"} there.`;
     return [
         { value: "direct", title: "Direct", description: "DBackup connects to the database port." },
@@ -67,10 +80,12 @@ function modeOptions(adapter: AdapterDefinition): ModeOption[] {
     ];
 }
 
-const TRANSFER_OPTIONS: ModeOption[] = [
-    { value: "local", title: "Shared folder", description: "The backup folder is mounted here too, for example as a Docker volume." },
-    { value: "ssh", title: "Over SSH", description: "DBackup fetches the file from the SQL Server machine." },
-];
+function transferOptions(mayReachServer: boolean): ModeOption[] {
+    return [
+        { value: "local", title: "Shared folder", description: "The backup folder is mounted here too, for example as a Docker volume.", ...adminOnly(mayReachServer) },
+        { value: "ssh", title: "Over SSH", description: "DBackup fetches the file from the SQL Server machine." },
+    ];
+}
 
 function PrimaryLogin(props: ConnectionSectionProps) {
     return <LoginField adapter={props.adapter} slot="primary" value={props.primaryCredentialId} onChange={props.onPrimaryChange} />;
@@ -80,6 +95,12 @@ function SshLogin(props: ConnectionSectionProps) {
     return <LoginField adapter={props.adapter} slot="ssh" value={props.sshCredentialId} onChange={props.onSshChange} />;
 }
 
+/** The service an Oracle connection asks the listener for. Nothing for the other engines. */
+function ServiceField({ adapter }: { adapter: AdapterDefinition }) {
+    if (!("serviceName" in (adapter.configSchema.shape as Record<string, unknown>))) return null;
+    return <Field adapter={adapter} fieldKey="serviceName" />;
+}
+
 function ConnectionPart(props: ConnectionSectionProps) {
     const { adapter } = props;
     const { watch } = useFormContext();
@@ -87,17 +108,19 @@ function ConnectionPart(props: ConnectionSectionProps) {
     const modeKey = isSqlite ? "mode" : "connectionMode";
     const hasMode = modeKey in (adapter.configSchema.shape as Record<string, unknown>);
     const mode = hasMode ? watch(`config.${modeKey}`) : "direct";
+    const mayReachServer = useMayReachServer();
 
     return (
         <>
             <NameField placeholder="My Production DB" />
             {hasMode && (
-                <ModeChoice fieldKey={modeKey} label={isSqlite ? "Where the file is" : "How DBackup connects"} options={modeOptions(adapter)} />
+                <ModeChoice fieldKey={modeKey} label={isSqlite ? "Where the file is" : "How DBackup connects"} options={modeOptions(adapter, mayReachServer)} />
             )}
             {isSqlite && mode === "local" && <Field adapter={adapter} fieldKey="path" label="Database file" />}
             {!isSqlite && mode === "direct" && (
                 <>
                     <HostPortFields adapter={adapter} hostKey="host" portKey="port" />
+                    <ServiceField adapter={adapter} />
                     <PrimaryLogin {...props} />
                 </>
             )}
@@ -108,10 +131,11 @@ function ConnectionPart(props: ConnectionSectionProps) {
 function TransferPart(props: ConnectionSectionProps) {
     const { adapter } = props;
     const transfer = useFormContext().watch("config.fileTransferMode");
+    const mayReachServer = useMayReachServer();
     return (
         <>
             <Field adapter={adapter} fieldKey="backupPath" />
-            <ModeChoice fieldKey="fileTransferMode" label="How DBackup gets the file" options={TRANSFER_OPTIONS} />
+            <ModeChoice fieldKey="fileTransferMode" label="How DBackup gets the file" options={transferOptions(mayReachServer)} />
             {transfer === "local" && <Field adapter={adapter} fieldKey="localBackupPath" />}
             {transfer === "ssh" && (
                 <>
@@ -181,6 +205,7 @@ export function DatabaseSection({ id, keys, ...props }: ConnectionSectionProps &
             return (
                 <>
                     <HostPortFields adapter={adapter} hostKey="host" portKey="port" />
+                    <ServiceField adapter={adapter} />
                     <PrimaryLogin {...props} />
                 </>
             );

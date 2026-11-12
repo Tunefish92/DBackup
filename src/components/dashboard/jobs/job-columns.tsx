@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { RunBars } from "@/components/dashboard/widgets/run-bars";
 import { DateDisplay } from "@/components/utils/date-display";
 import type { JobListItem } from "@/services/jobs/job-list-service";
@@ -19,7 +19,7 @@ const Muted = ({ children }: { children: React.ReactNode }) => <span className="
  * The columns of the job table. Name and actions stay put, everything in between can be moved
  * and switched off in the Columns menu, and some start switched off.
  */
-export function jobColumns({ renderActions, onOpen }: ColumnOptions): ColumnDef<JobListItem>[] {
+export function jobColumns({ renderActions, onOpen }: ColumnOptions): AppColumnDef<JobListItem>[] {
     return [
         {
             accessorKey: "name",

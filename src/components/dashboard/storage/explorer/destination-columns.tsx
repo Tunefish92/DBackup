@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ClockAlert } from "lucide-react";
 import { kindNames } from "@/components/adapter/connection-columns";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -80,7 +80,7 @@ function AlertsCell({ destination }: { destination: ExplorerDestination }) {
 }
 
 /** The columns of the list of destinations, with two only for the filters. */
-export function destinationColumns({ jobs, renderActions }: ColumnsInput): ColumnDef<ExplorerDestination>[] {
+export function destinationColumns({ jobs, renderActions }: ColumnsInput): AppColumnDef<ExplorerDestination>[] {
     return [
         {
             id: "destination",
@@ -94,6 +94,7 @@ export function destinationColumns({ jobs, renderActions }: ColumnsInput): Colum
                         <p className="truncate text-xs text-muted-foreground">
                             {kindNames.get(row.original.adapterId) ?? row.original.adapterId}
                             {row.original.airGapped && " · air-gapped"}
+                            {row.original.provider && ` · provided by ${row.original.provider}`}
                         </p>
                     </div>
                 </div>

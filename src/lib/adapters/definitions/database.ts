@@ -1,11 +1,16 @@
 import { z } from "zod";
 import { safePath, safePathRegex, safeBinaryPath, sshFields } from "./shared";
+import { PASSWORD_LINE_BREAK, fitsOptionFile } from "../database/mysql/option-file";
+import { firebirdHostProblem } from "../database/firebird/host";
+
+/** A password the MySQL and MariaDB tools read from their option file, see `option-file.ts`. */
+const optionFilePassword = () => z.string().refine(fitsOptionFile, PASSWORD_LINE_BREAK).optional();
 
 export const MySQLSchema = z.object({
     host: z.string().default("localhost"),
     port: z.coerce.number().default(3306),
     user: z.string().min(1, "User is required"),
-    password: z.string().optional(),
+    password: optionFilePassword(),
     database: z.union([z.string(), z.array(z.string())]).default(""),
     options: z.string().optional().describe("Additional mysqldump options"),
     // What the dump holds besides tables, views and triggers. A source saved before these existed
@@ -21,7 +26,7 @@ export const MariaDBSchema = z.object({
     host: z.string().default("localhost"),
     port: z.coerce.number().default(3306),
     user: z.string().min(1, "User is required"),
-    password: z.string().optional(),
+    password: optionFilePassword(),
     database: z.union([z.string(), z.array(z.string())]).default(""),
     options: z.string().optional().describe("Additional mariadb-dump options"),
     // What the dump holds besides tables, views and triggers. A source saved before these existed
@@ -117,7 +122,11 @@ export const AzureSQLSchema = z.object({
 });
 
 export const FirebirdSchema = z.object({
-    host: z.string().default("localhost"),
+    // The host goes in front of `:path` in the connection string of gbak and isql, see `firebird/host.ts`.
+    host: z.string().superRefine((value, ctx) => {
+        const problem = firebirdHostProblem(value);
+        if (problem) ctx.addIssue({ code: "custom", message: problem });
+    }).default("localhost"),
     port: z.coerce.number().default(3050),
     user: z.string().min(1, "User is required").default("SYSDBA"),
     password: z.string().optional(),
@@ -130,6 +139,34 @@ export const FirebirdSchema = z.object({
     database: z.union([z.string(), z.array(z.string())]).default(""),
     firebirdBinaryPath: safeBinaryPath.default("gbak").optional().describe("Path to gbak binary (default: gbak)"),
     options: z.string().optional().describe("Additional gbak options"),
+    ...sshFields,
+});
+
+/**
+ * Oracle Database 12.1 and later.
+ *
+ * A database of a job is a schema. Data Pump exports and imports it inside the server, and the
+ * dump file travels over the SQL*Net connection itself, so neither Oracle client tools nor access
+ * to the file system of the server are needed. The service name and the directory object end up
+ * in a connect string and in PL/SQL, which is why both are restricted to the characters Oracle
+ * allows in an unquoted name.
+ */
+export const OracleSchema = z.object({
+    host: z.string().default("localhost"),
+    port: z.coerce.number().default(1521),
+    serviceName: z.string()
+        .min(1, "Service name is required")
+        .regex(/^[A-Za-z0-9][A-Za-z0-9._$#-]*$/, "Service name may only contain letters, digits, dots, underscores, hyphens, $ and #")
+        .describe("Service name of the database or pluggable database, like FREEPDB1"),
+    user: z.string().min(1, "User is required"),
+    password: z.string().optional(),
+    database: z.union([z.string(), z.array(z.string())]).default(""),
+    directory: z.string()
+        .regex(/^[A-Za-z][A-Za-z0-9_$#]{0,127}$/, "Directory object must be an unquoted Oracle name, like DATA_PUMP_DIR")
+        .default("DATA_PUMP_DIR")
+        .describe("Directory object Data Pump writes its dump and log files to"),
+    consistent: z.boolean().default(true).describe("Export each schema as of one point in time"),
+    tls: z.boolean().default(false).describe("Connect with TLS (TCPS)"),
     ...sshFields,
 });
 
@@ -157,8 +194,9 @@ export type MSSQLConfig = z.infer<typeof MSSQLSchema>;
 export type AzureSQLConfig = z.infer<typeof AzureSQLSchema>;
 export type RedisConfig = z.infer<typeof RedisSchema>;
 export type FirebirdConfig = z.infer<typeof FirebirdSchema>;
+export type OracleConfig = z.infer<typeof OracleSchema>;
 
-export type DatabaseConfig = MySQLConfig | MariaDBConfig | PostgresConfig | MongoDBConfig | SQLiteConfig | MSSQLConfig | AzureSQLConfig | RedisConfig | FirebirdConfig;
+export type DatabaseConfig = MySQLConfig | MariaDBConfig | PostgresConfig | MongoDBConfig | SQLiteConfig | MSSQLConfig | AzureSQLConfig | RedisConfig | FirebirdConfig | OracleConfig;
 
 // Generic type alias for dialect base class (accepts any database config)
 export type AnyDatabaseConfig = DatabaseConfig;

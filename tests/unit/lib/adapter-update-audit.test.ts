@@ -8,7 +8,7 @@ import { NextRequest } from "next/server";
 vi.stubEnv("ENCRYPTION_KEY", "c".repeat(64));
 
 const mocks = vi.hoisted(() => ({
-    ctx: { userId: "u1", permissions: [], isSuperAdmin: true, authMethod: "session" },
+    ctx: { userId: "u1", permissions: [], isPlatformAdmin: true, authMethod: "session" },
     findUnique: vi.fn(),
     update: vi.fn(),
     profiles: vi.fn(),
@@ -21,6 +21,7 @@ vi.mock("@/lib/logging/logger", () => ({
 vi.mock("@/lib/auth/access-control", () => ({
     getAuthContext: vi.fn(async () => mocks.ctx),
     checkPermissionWithContext: vi.fn(),
+    hasPermissionWithContext: () => true,
 }));
 vi.mock("next/headers", () => ({ headers: vi.fn().mockResolvedValue(new Headers()) }));
 vi.mock("@/lib/adapters", () => ({ registerAdapters: vi.fn() }));

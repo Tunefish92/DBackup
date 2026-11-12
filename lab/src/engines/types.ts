@@ -8,14 +8,14 @@ import { randomUUID } from "crypto";
 import type { LabConfig, SshLogin } from "../config";
 
 /** The adapter ids of DBackup the lab runs in containers. SQLite has a file of its own and no container. */
-export type Engine = "mysql" | "mariadb" | "postgres" | "mongodb" | "mssql" | "redis" | "valkey" | "firebird";
+export type Engine = "mysql" | "mariadb" | "postgres" | "mongodb" | "mssql" | "redis" | "valkey" | "firebird" | "oracle";
 
 /** Runs a shell command where the database lives and returns what it printed. Throws when it fails. */
 export type Run = (command: string, input?: string) => Promise<string>;
 
 /** The command line tools of an engine where its database lives, logged in. */
 export interface Clients {
-    /** The interactive client: mysql, psql, mongosh, sqlcmd, redis-cli, isql. */
+    /** The interactive client: mysql, psql, mongosh, sqlcmd, redis-cli, isql, sqlplus. */
     cli: string;
     /** The dump tool, for the engines whose fingerprint is a dump. */
     dump?: string;

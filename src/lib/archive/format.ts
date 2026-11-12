@@ -71,6 +71,7 @@ export const EXTENSION_BY_FORMAT: Record<DumpFormat, string> = {
     bak: "bak",
     fbk: "fbk",
     bacpac: "bacpac",
+    dmp: "dmp",
     rdb: "rdb",
     sqlite: "sqlite",
 };

@@ -1,5 +1,8 @@
 import prisma from "@/lib/prisma";
+import { runAsTenant } from "@/lib/tenant/context";
+import { HOME_TENANT_ID } from "@/lib/tenant/home";
 import { encrypt } from "@/lib/crypto";
+import { NotFoundError } from "@/lib/logging/errors";
 
 export interface CreateSsoProviderInput {
     name: string;
@@ -11,6 +14,8 @@ export interface CreateSsoProviderInput {
     /** The group someone the provider adds starts in, null for none. */
     defaultGroupId?: string | null;
     domain?: string | null; // Email domain for SSO matching (e.g., "example.com")
+    /** The tenant that brings the provider, null for one of the platform. */
+    tenantId?: string | null;
     adapterConfig?: string; // JSON string of the raw adapter configuration
 
     // Credentials
@@ -29,7 +34,27 @@ export interface CreateSsoProviderInput {
      * This should come from the adapter as different providers have different paths.
      */
     discoveryEndpoint?: string;
-    scope?: string;
+}
+
+/**
+ * The scopes DBackup asks a provider for, what a sign-in needs and nothing more. better-auth reads
+ * them from `scopes` of the config and asks for `offline_access` too when the key is missing,
+ * which Google refuses. DBackup never uses a refresh token, so it does not ask for one.
+ */
+export const OIDC_SCOPES = ["openid", "profile", "email"];
+
+/** The scopes a saved config of better-auth names, so a change of the provider keeps them, null for none. */
+function savedScopes(oidcConfig: string | null): string[] | null {
+    if (!oidcConfig) {
+        return null;
+    }
+    try {
+        const scopes = (JSON.parse(oidcConfig) as { scopes?: unknown }).scopes;
+        const valid = Array.isArray(scopes) && scopes.length > 0 && scopes.every((scope) => typeof scope === "string");
+        return valid ? (scopes as string[]) : null;
+    } catch {
+        return null;
+    }
 }
 
 export interface UpdateSsoProviderInput extends Partial<CreateSsoProviderInput> {
@@ -47,20 +72,25 @@ export class OidcProviderService {
 
     /**
      * A provider as the audit log compares it before and after a change: in plain text, so a new
-     * secret shows as changed, with the name of the group of new people. The secret is never written.
+     * secret shows as changed, with the name of the group of new people and of its tenant. The
+     * secret is never written.
      */
     static async getAuditState(id: string) {
         const provider = await prisma.ssoProvider.findUnique({ where: { id } });
         if (!provider) return null;
-        const group = provider.defaultGroupId
-            ? await prisma.group.findUnique({ where: { id: provider.defaultGroupId }, select: { name: true } })
-            : null;
-        return { ...provider, groupName: group?.name ?? null };
+        // The group lives in the tenant of the provider, the home tenant for one of the platform.
+        const [group, tenant] = await Promise.all([
+            provider.defaultGroupId
+                ? runAsTenant(provider.tenantId ?? HOME_TENANT_ID, () => prisma.group.findUnique({ where: { id: provider.defaultGroupId! }, select: { name: true } }))
+                : null,
+            provider.tenantId ? prisma.tenant.findUnique({ where: { id: provider.tenantId }, select: { name: true } }) : null,
+        ]);
+        return { ...provider, groupName: group?.name ?? null, tenantName: tenant?.name ?? null };
     }
 
-    /** A group new people of a provider could start in, with what it may do. */
-    static async getGroup(id: string) {
-        return prisma.group.findUnique({ where: { id }, select: { id: true, name: true, permissions: true } });
+    /** A group new people of a provider could start in, with what it may do, a group of the provider's tenant. */
+    static async getGroup(id: string, tenantId: string = HOME_TENANT_ID) {
+        return runAsTenant(tenantId, () => prisma.group.findUnique({ where: { id }, select: { id: true, name: true, permissions: true } }));
     }
 
     static async createProvider(data: CreateSsoProviderInput) {
@@ -84,7 +114,7 @@ export class OidcProviderService {
             tokenEndpoint: data.tokenEndpoint,
             userInfoEndpoint: data.userInfoEndpoint,
             jwksEndpoint: data.jwksEndpoint,
-            scope: data.scope || "openid profile email", // Ensure openid scope is present
+            scopes: OIDC_SCOPES,
             // discoveryEndpoint is required by better-auth even with skipDiscovery
             // It's called in the callback handler regardless of skipDiscovery setting
             discoveryEndpoint,
@@ -102,6 +132,7 @@ export class OidcProviderService {
                 allowProvisioning: data.allowProvisioning ?? true,
                 defaultGroupId: data.defaultGroupId ?? null,
                 domain: data.domain, // Required by better-auth SSO plugin
+                tenantId: data.tenantId ?? null,
                 adapterConfig: data.adapterConfig,
 
                 clientId: encryptedClientId,
@@ -126,7 +157,7 @@ export class OidcProviderService {
 
         // We need existing data if partial update
         const existing = await prisma.ssoProvider.findUnique({ where: { id } });
-        if (!existing) throw new Error("Provider not found");
+        if (!existing) throw new NotFoundError("Provider", id);
 
         // Encrypt credentials if provided
         const encryptedClientId = data.clientId ? encrypt(data.clientId) : undefined;
@@ -160,7 +191,7 @@ export class OidcProviderService {
                     ...merged,
                     clientId: encrypt(merged.clientId ?? ""),
                     clientSecret: encrypt(merged.clientSecret ?? ""),
-                    scope: data.scope || "openid profile email",
+                    scopes: savedScopes(existing.oidcConfig) ?? OIDC_SCOPES,
                     discoveryEndpoint: discEndpoint,
                     skipDiscovery: true,
                 });
@@ -175,6 +206,8 @@ export class OidcProviderService {
                 enabled: data.enabled,
                 allowProvisioning: data.allowProvisioning,
                 defaultGroupId: data.defaultGroupId,
+                // Moves the provider to another tenant, or to the platform with null.
+                tenantId: data.tenantId,
                 adapterConfig: data.adapterConfig,
 
                 clientId: encryptedClientId,

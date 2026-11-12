@@ -1,12 +1,12 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ChevronRight } from "lucide-react";
 import type { AuditRow } from "@/services/audit/audit-types";
 import { FromCell, WhatCell, WhenCell, WhoCell } from "./audit-cells";
 
 /** The columns of the entries. The server sorts and filters, so no column sorts on its own. */
-export function auditColumns({ now }: { now: number }): ColumnDef<AuditRow>[] {
+export function auditColumns({ now }: { now: number }): AppColumnDef<AuditRow>[] {
     return [
         { id: "when", accessorFn: (row) => row.at, header: "When", enableSorting: false, meta: { pin: "start" }, cell: ({ row }) => <WhenCell at={row.original.at} now={now} /> },
         { id: "who", accessorFn: (row) => row.actor.key, header: "Who", enableSorting: false, cell: ({ row }) => <WhoCell actor={row.original.actor} /> },

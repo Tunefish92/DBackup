@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '@/lib/logging/logger'
 import { wrapError } from '@/lib/logging/errors'
+import { tenantScopeExtension } from '@/lib/tenant/prisma-scope'
+import { relationOrderPaging } from '@/lib/prisma-paging'
+import { sqliteAdapterFor } from '@/lib/sqlite-adapter'
 
 const log = logger.child({ module: 'Prisma' })
 
@@ -12,35 +15,21 @@ BigInt.prototype.toJSON = function () {
 }
 
 // ── SQLite Hardening ─────────────────────────────────────────
-// Forces a single physical connection (connection_limit=1) so PRAGMA settings
-// (WAL, busy_timeout) reliably apply to every query and writers never compete
-// against each other over separate file handles. Applied here so users don't
-// need to change their DATABASE_URL - the hardening is transparent to the setup.
-const SQLITE_BUSY_TIMEOUT_MS = 5000
+// The driver adapter holds one connection to the file, so the PRAGMA settings (WAL) apply to
+// every query and writers never compete over separate file handles. It also sets the busy
+// timeout, see sqlite-adapter.ts.
 
 // WAL mode is on by default (recommended). Set SQLITE_WAL_MODE=false to opt out,
 // e.g. when the /data volume lives on a filesystem that doesn't support WAL's
 // shared-memory locking (some network shares/NFS mounts).
 const isWalModeEnabled = process.env.SQLITE_WAL_MODE !== 'false'
 
-function withSqliteHardening(url: string): string {
-  const [base, query = ''] = url.split('?')
-  const params = new URLSearchParams(query)
-  if (!params.has('connection_limit')) params.set('connection_limit', '1')
-  return `${base}?${params.toString()}`
-}
-
 const prismaClientSingleton = () => {
-  const databaseUrl = withSqliteHardening(process.env.DATABASE_URL ?? 'file:./prisma/dev.db')
-  const baseClient = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+  const baseClient = new PrismaClient({ adapter: sqliteAdapterFor(process.env.DATABASE_URL ?? 'file:./dev.db') })
 
-  // Enable WAL mode and a busy timeout on the single shared connection.
-  // WAL lets readers and the writer operate concurrently without blocking each
-  // other, and busy_timeout makes writers wait briefly instead of failing
-  // instantly with "database is locked" during rare contention (e.g. `prisma
-  // migrate deploy` or the `sqlite3` CLI touching the file at the same time).
-  // Both PRAGMAs return a result row, so SQLite rejects them via $executeRawUnsafe
-  // ("Execute returned results, which is not allowed in SQLite") - use $queryRawUnsafe instead.
+  // Enable WAL mode on the single shared connection. WAL lets readers and the writer operate
+  // concurrently without blocking each other. The PRAGMA returns a result row, so it runs
+  // through $queryRawUnsafe.
   //
   // journal_mode is persisted inside the database file itself, not just for the
   // current connection. Once a file has been switched to WAL it stays in WAL
@@ -66,9 +55,6 @@ const prismaClientSingleton = () => {
       .then(() => announce('SQLite WAL mode disabled via SQLITE_WAL_MODE=false'))
       .catch((err) => log.warn('Failed to disable SQLite WAL mode', {}, wrapError(err)))
   }
-
-  baseClient.$queryRawUnsafe(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS};`)
-    .catch((err) => log.warn('Failed to set SQLite busy_timeout', {}, wrapError(err)))
 
   // ── Transparent SSO Secret Decryption ────────────────────────
   // SSO clientId/clientSecret and oidcConfig are stored encrypted in the DB.
@@ -115,7 +101,15 @@ const prismaClientSingleton = () => {
     },
   });
 
-  return client;
+  // ── Tenants ──────────────────────────────────────────────────
+  // Every query on a tenant model is narrowed to the tenant of the code that runs now, see
+  // src/lib/tenant/prisma-scope.ts. The request is asked lazily, it imports this client itself.
+  // A read of more than 900 parents with an ordered relation breaks Prisma on SQLite, so it runs
+  // in pages, see src/lib/prisma-paging.ts. Prisma runs the extensions in the order they were added,
+  // so the tenant filter narrows the read first and every page carries that narrowed read.
+  return client
+    .$extends(tenantScopeExtension(async () => (await import('./tenant/current')).requestScope()))
+    .$extends(relationOrderPaging);
 }
 
 declare global {

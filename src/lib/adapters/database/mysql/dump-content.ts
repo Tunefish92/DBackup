@@ -1,8 +1,8 @@
-import type { ExecutionHost } from "@/lib/transport";
+import type { ExecResult, ExecutionHost } from "@/lib/transport";
 import type { LogLevel, LogType } from "@/lib/core/logs";
 import type { MySQLConfig, MariaDBConfig } from "@/lib/adapters/definitions";
 import { compareVersions } from "@/lib/utils";
-import { MYSQL_CLIENT, buildConnectionArgs } from "./args";
+import { MYSQL_CLIENT, NO_LOCAL_INFILE, buildConnectionArgs } from "./args";
 
 /**
  * What a MySQL or MariaDB dump holds besides tables, views and triggers, which the dump tools
@@ -133,6 +133,24 @@ export function connectionClientOf(config: { disableSsl?: boolean }, host: Execu
     return config.disableSsl ? dumpClientOf(host, binary) : Promise.resolve(undefined);
 }
 
+/**
+ * Runs SQL in a database through the mysql client next to the dump tool, its answer printed with
+ * the flags of `output`. Throws when there is no mysql client.
+ */
+export async function askerFor(
+    config: MySQLConfig | MariaDBConfig,
+    dbName: string,
+    host: ExecutionHost,
+    authArgs: string[],
+    output: string[],
+): Promise<(sql: string) => Promise<ExecResult>> {
+    const mysqlBin = await host.which(...MYSQL_CLIENT);
+    const client = await connectionClientOf(config, host, mysqlBin);
+    // The database goes in as an argument of its own, so its name needs no quoting.
+    return (sql: string) =>
+        host.exec([mysqlBin, ...authArgs, NO_LOCAL_INFILE, ...buildConnectionArgs(config, host, { client }), `--database=${dbName}`, ...output, "-e", sql]);
+}
+
 /** The routines of the current database whose body the login may not read, which make the dump tool give up. */
 const HIDDEN_ROUTINES =
     "SELECT CONCAT(LOWER(ROUTINE_TYPE), ' ', ROUTINE_NAME) FROM information_schema.ROUTINES " +
@@ -160,11 +178,7 @@ export async function readableContent(
 
     const overrides: Partial<DumpContent> = {};
     try {
-        const mysqlBin = await host.which(...MYSQL_CLIENT);
-        const client = await connectionClientOf(config, host, mysqlBin);
-        // The database goes in as an argument of its own, so its name needs no quoting.
-        const ask = (sql: string) =>
-            host.exec([mysqlBin, ...authArgs, ...buildConnectionArgs(config, host, { client }), `--database=${dbName}`, "-N", "-s", "-e", sql]);
+        const ask = await askerFor(config, dbName, host, authArgs, ["-N", "-s"]);
 
         if (planned.events) {
             const events = await ask("SHOW EVENTS");

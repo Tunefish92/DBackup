@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DataTable, type BulkAction, type DataTableFilterableColumn, type RowMenuBulk } from "@/components/ui/data-table";
 import { JOIN_END } from "@/components/ui/page-head";
 import { QuickFilter } from "@/components/ui/quick-filter";
@@ -15,7 +15,7 @@ interface TemplateTableProps<T extends { id: string }> {
     rows: T[] | null;
     isLoading: boolean;
     onRefresh: () => void;
-    columns: ColumnDef<T>[];
+    columns: AppColumnDef<T>[];
     filters?: DataTableFilterableColumn<T>[];
     searchPlaceholder: string;
     /** What the quick filters split the rows by. */

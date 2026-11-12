@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { CalendarClock, TriangleAlert } from "lucide-react";
 import { kindNames } from "@/components/adapter/connection-columns";
 import { DestinationTile } from "@/components/dashboard/storage/explorer/explorer-cells";
@@ -9,6 +8,7 @@ import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
 import { cn, formatBytes } from "@/lib/utils";
 import type { ExplorerDatabase, ExplorerDbJob, ExplorerServer } from "@/services/databases/database-explorer-types";
 import { compactCount, databaseHref, statesOf } from "./database-model";
+import { RecordLink } from "./record-link";
 
 /** A job that backs up a database, as a small chip with its name. */
 export function JobChip({ name }: { name: string }) {
@@ -73,10 +73,10 @@ interface ColumnsInput {
 }
 
 /** The columns of the list of databases, with four only for the filters. */
-export function databaseColumns({ serversById, jobsById, coverage, biggest, renderActions }: ColumnsInput): ColumnDef<ExplorerDatabase>[] {
+export function databaseColumns({ serversById, jobsById, coverage, biggest, renderActions }: ColumnsInput): AppColumnDef<ExplorerDatabase>[] {
     const jobsOf = (database: ExplorerDatabase) => (database.jobIds.length > 0 ? database.jobIds : ["none"]);
     const stateOf = (database: ExplorerDatabase) => statesOf(database, serversById.get(database.serverId), coverage);
-    const columns: ColumnDef<ExplorerDatabase>[] = [
+    const columns: AppColumnDef<ExplorerDatabase>[] = [
         {
             id: "database",
             accessorFn: (database) => database.name,
@@ -88,12 +88,13 @@ export function databaseColumns({ serversById, jobsById, coverage, biggest, rend
                         <DestinationTile destination={{ adapterId: server?.adapterId ?? "" }} />
                         <div className="min-w-0">
                             {/* The keyboard way in, a click anywhere on the row opens it too. */}
-                            <Link
+                            <RecordLink
                                 href={databaseHref(row.original)}
+                                tenantId={row.original.tenantId}
                                 className="block truncate rounded-sm font-medium outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring/50"
                             >
                                 {row.original.name}
-                            </Link>
+                            </RecordLink>
                             <p className="truncate text-xs text-muted-foreground">{subOf(row.original, server)}</p>
                         </div>
                     </div>

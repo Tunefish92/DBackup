@@ -6,7 +6,7 @@ Back up MySQL or MariaDB databases with `mariadb-dump` or `mysqldump`, one datab
 
 | Engine | Versions |
 | :--- | :--- |
-| **MySQL** | 5.7, 8.0, 8.4, 9.0 |
+| **MySQL** | 5.7, 8.0, 8.4, 9.x, 26.x |
 | **MariaDB** | 10.x, 11.x |
 
 ::: tip Older MySQL servers
@@ -31,6 +31,8 @@ DBackup needs three client tools, on its own server in direct mode and on the SS
 | `mariadb-admin` or `mysqladmin` | Test connection, health checks and detecting the server version |
 
 **Docker**: The image ships Debian's `mariadb-client`, so it runs the MariaDB tools against MySQL servers as well.
+
+**Restores lock the client down.** A dump can hold commands of the client itself, like `system` or `\!` for a shell command and `source` or `tee` for a file of the machine the client runs on. A restore runs the client with `--binary-mode`, which turns those commands off, with `--sandbox` (MariaDB) or `--skip-system-command` (MySQL), and with `--local-infile=0`. A dump that holds such a command fails at that line. In direct mode a client that knows neither `--sandbox` nor `--system-command`, or no `--binary-mode`, is refused before the restore starts, with its version in the message. That needs MariaDB client 10.5.25, 10.6.18, 10.11.8 or 11.4.2 or newer, or MySQL client 8.0.40 or 8.4.3 or newer. The Docker image ships one. Over SSH an older client on the SSH server still restores with whatever of these options it knows.
 
 ### SSH Mode
 
@@ -60,7 +62,7 @@ MySQL / MariaDB requires a [Credential Profile](/user-guide/security/credential-
 | **How DBackup connects** | **Direct** or **Over SSH** | - | ✅ |
 | **Host** | Database server hostname, over SSH as seen from the SSH server | `localhost` | ✅ |
 | **Port** | MySQL port | `3306` | ✅ |
-| **Login** | `USERNAME_PASSWORD` credential profile | - | ✅ |
+| **Login** | `USERNAME_PASSWORD` credential profile. Its password cannot hold a line break or a NUL character, since the tools read it from an option file | - | ✅ |
 | **SSH host** | SSH server hostname or IP, over SSH only | - | ✅ |
 | **Port** | SSH server port, over SSH only | `22` | ❌ |
 | **SSH login** | `SSH_KEY` credential profile, over SSH only | - | ✅ |
@@ -69,6 +71,10 @@ MySQL / MariaDB requires a [Credential Profile](/user-guide/security/credential-
 | **Stored procedures and functions** | Backs up the routines of each database (`--routines`) | On | ❌ |
 | **Events** | Backs up the scheduled events of each database (`--events`) | On | ❌ |
 | **Disable SSL** | Connects without SSL, for a server with a self-signed certificate. Applies to every connection, restores included | Off | ❌ |
+
+::: info Extra options are for platform admins
+In direct mode the dump tools run on the server DBackup runs on, where an option can name any file DBackup may write. So only a platform admin, signed in with a session in the home tenant, saves, changes or tests a direct connection with **Extra options**, and anyone else opens such a connection read-only and may still pick it in a job. Over SSH the options are open to everyone. See [Connections to the Server DBackup Runs On](/user-guide/admin/tenants#connections-to-the-server-dbackup-runs-on).
+:::
 
 The source has no database field. Which databases to back up is picked in the **Source** part of the job. **All databases** runs `SHOW DATABASES` on every run and leaves out `information_schema`, `mysql`, `performance_schema` and `sys`, so a database added later is backed up too.
 
@@ -143,6 +149,8 @@ DBackup dumps each database of the job on its own, with these flags for the swit
 
 Triggers and views are always included, the dump tools add them on their own. **Extra options** come after these flags, so `--skip-routines` there turns the routines off as well. DBackup adds no flag the extra options already set, and leaves out the snapshot when they contain `--lock-tables` or `--lock-all-tables`, which cannot be combined with it. When the tool is MySQL's own `mysqldump` 5.6.9 or later, DBackup also adds `--set-gtid-purged=OFF`, so a server with GTIDs needs no `RELOAD` and the dump carries no GTID set that a restore onto another server refuses.
 
+On MySQL 26 and later DBackup reads the stored procedures and functions itself with `SHOW CREATE` and writes them into the dump in the shape `mysqldump` uses. The MariaDB dump tool takes these version numbers for MariaDB and asks for packages, which MySQL does not know. A `--routines` in **Extra options** still goes to the dump tool and fails there.
+
 ::: warning MyISAM and Aria tables
 The snapshot only covers transactional tables. MyISAM and Aria tables are read without a lock, so writes to them during the dump can leave them inconsistent. Turn off **Consistent snapshot** for a source whose MyISAM tables change while it is backed up, which locks the tables of each database during its dump instead.
 :::
@@ -153,7 +161,9 @@ Over SSH, DBackup first checks that `mariadb-dump` or `mysqldump` exists on the 
 
 ### Password Handling
 
-The password never appears on a command line. DBackup writes it to a `[client]` file with mode `0600` and passes it to each tool with `--defaults-file`. In direct mode the file is a local temp file. Over SSH it is written straight to `/tmp/dbackup_<uuid>.cnf` on the SSH server over SFTP, with no copy on the DBackup server. The file is deleted right after use, also when the command fails.
+The password never appears on a command line. DBackup writes it to a `[client]` file with mode `0600` and passes it to each tool with `--defaults-file`. In direct mode the file is a local temp file. Over SSH it is written straight to `/tmp/dbackup_<uuid>.cnf` on the SSH server over SFTP, with no copy on the DBackup server. The file is deleted right after use, also when the command fails. A password with a line break or a NUL character is refused, on save and again before the file is written, since the tools would read the rest as options of their own.
+
+The tools read only that file and no option file of the machine they run on. A login without a password in direct mode runs them with `--no-defaults`, so a `~/.my.cnf` on the DBackup server is never read either. Over SSH such a login may still rely on the `~/.my.cnf` of the SSH user. Every call of the `mysql` or `mariadb` client runs with `--local-infile=0`, so a server can never ask it for a local file.
 
 ### Output
 

@@ -16,7 +16,7 @@ import type { TransportResolver } from "./types";
 type ConnectivityResult = { success: boolean; message: string; version?: string };
 
 /** Adapter shape this module needs, kept structural so tests can pass a stub. */
-type CheckableAdapter = Pick<BaseAdapter, "id" | "test" | "ping"> & {
+type CheckableAdapter = Pick<BaseAdapter, "id" | "test" | "ping" | "pingRead"> & {
     transport?: TransportResolver;
 };
 
@@ -24,7 +24,8 @@ type CheckableAdapter = Pick<BaseAdapter, "id" | "test" | "ping"> & {
  * Run the cheapest available connectivity check with a transport built from the
  * adapter's own config.
  *
- * Returns null when the adapter implements neither check.
+ * Returns null when the adapter implements neither check. `readOnly` is for a connection DBackup
+ * only reads from, a directory source, which `pingRead()` checks without asking for write access.
  *
  * The timeout is applied INSIDE the host scope on purpose. Racing a timeout
  * against the scope itself would skip its cleanup, leaking one socket per check
@@ -33,9 +34,10 @@ type CheckableAdapter = Pick<BaseAdapter, "id" | "test" | "ping"> & {
 export async function runConnectivityCheck(
     adapter: CheckableAdapter,
     config: unknown,
-    options: { timeoutMs?: number; label?: string } = {},
+    options: { timeoutMs?: number; label?: string; readOnly?: boolean } = {},
 ): Promise<ConnectivityResult | null> {
-    const checkFn = adapter.ping ?? adapter.test;
+    // A connection DBackup only reads from is checked by reading, where the adapter can.
+    const checkFn = (options.readOnly ? adapter.pingRead : undefined) ?? adapter.ping ?? adapter.test;
     if (!checkFn) return null;
 
     return withHost(adapter, config, async (host) => {

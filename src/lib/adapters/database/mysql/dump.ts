@@ -15,7 +15,8 @@ import {
 import { TarFileEntry } from "../common/types";
 import { awaitDumpProcess } from "../common/dump-process";
 import { MYSQL_DUMP, withAuthArgs } from "./args";
-import { dumpClientOf, readableContent } from "./dump-content";
+import { askerFor, dumpClientOf, plannedContent, readableContent } from "./dump-content";
+import { insertAfterUse, needsOwnRoutines, readRoutines, routinesSql } from "./routines";
 import { compareVersions } from "@/lib/utils";
 
 /** Oldest MySQL version the adapter is documented and tested against. */
@@ -71,9 +72,17 @@ async function dumpSingleDatabase(
     await withAuthArgs(host, config.password, async (authArgs) => {
         // Events and routines the login may not read are left out with a warning, not a failed dump.
         const readable = await readableContent(config, dbName, host, authArgs, onLog);
+        // On MySQL 26 and later the MariaDB dump tool fails on --routines, so DBackup writes them itself.
+        const ownRoutines = plannedContent(config).routines && readable.routines !== false && needsOwnRoutines(config);
+        const routines = ownRoutines
+            ? await readRoutines(await askerFor(config, dbName, host, authArgs, ["--xml", "--default-character-set=utf8mb4"]), dbName)
+            : [];
+        if (ownRoutines) {
+            onLog(`Stored procedures and functions of ${dbName} read by DBackup, ${routines.length} found. The dump tool cannot read them on MySQL ${config.detectedVersion}.`);
+        }
         // Both transports get the version-aware dialect flags. The SSH path used
         // to hand-roll a smaller argument set and miss them entirely.
-        const args = dialect.getDumpArgs({ ...config, ...readable }, [dbName], host, client);
+        const args = dialect.getDumpArgs({ ...config, ...readable, ...(ownRoutines ? { routines: false } : {}) }, [dbName], host, client);
 
         const safeCmd = `${dumpBin} ${args.join(' ').replace(config.password || '___NONE___', '******')}`;
         onLog(`Dumping database: ${dbName}`, 'info', 'command', safeCmd);
@@ -81,7 +90,11 @@ async function dumpSingleDatabase(
         const proc = await host.spawn([dumpBin, ...authArgs, ...args]);
         const writeStream = createWriteStream(destinationPath);
 
-        proc.stdout.pipe(writeStream);
+        if (routines.length > 0) {
+            proc.stdout.pipe(insertAfterUse(routinesSql(dbName, routines))).pipe(writeStream);
+        } else {
+            proc.stdout.pipe(writeStream);
+        }
         proc.stderr.on('data', (data: Buffer) => {
             const msg = data.toString().trim();
             // Benign noise from the MariaDB tools.

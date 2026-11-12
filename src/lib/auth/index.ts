@@ -1,8 +1,11 @@
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { PROFILE_CHANGE_REFUSED, profilePermissionFor, userHolds } from "@/lib/auth/profile-guard";
+import { PROFILE_CHANGE_REFUSED, SERVER_ONLY_ENDPOINT_REFUSED, TRUSTED_DEVICE_REFUSED, asksTrustedDevice, profileChangeRefused, refusedFromBrowser } from "@/lib/auth/profile-guard";
 import { refuseWeakPassword } from "@/lib/auth/password-guard";
-import { refuseLateSignUp } from "@/lib/auth/sign-up-guard";
+import { claimFirstSignUp, refuseLateSignUp } from "@/lib/auth/sign-up-guard";
+import { keepPasskeyFactor } from "@/lib/auth/passkey-factor-guard";
+import { refusePasskeyFirstFactor } from "@/lib/auth/passkey-login-guard";
+import { refuseWithoutReauth } from "@/lib/auth/reauth-guard";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@/lib/prisma";
 import { twoFactor } from "better-auth/plugins";
@@ -10,11 +13,16 @@ import { passkey } from "@better-auth/passkey";
 import { sso } from "@better-auth/sso";
 import { shouldBlockBrowserEmailAuth } from "@/lib/auth/env-flags";
 import { recordSignIn, recordSignOut } from "@/lib/auth/sign-in-audit";
-import { placeSsoUser, refuseDisabledProvider, refuseSsoSignUp } from "@/lib/auth/sso-guard";
+import { noteSecurityChange, recordSecurityChange } from "@/lib/auth/security-audit";
+import { isSsoManagementRequest, refuseDisabledProvider } from "@/lib/auth/sso-guard";
+import { afterSsoLink, afterSsoUser, beforeSsoLink, beforeSsoSession, beforeSsoUser, refusedSsoLinkRedirect } from "@/lib/auth/sso-hooks";
 import { logger } from "@/lib/logging/logger";
 import { wrapError } from "@/lib/logging/errors";
 import { DEFAULT_SESSION_DURATION, SESSION_OPTIONS, sessionDurationOf, sessionEndsAt } from "@/lib/auth/session-lifetime";
 import { CLIENT_ADDRESS_HEADER } from "@/lib/core/client-address";
+import { foreignSsoTarget, trustedOriginsFor } from "@/lib/auth/trusted-origins";
+import { accountLinkingOptions } from "@/lib/auth/account-linking";
+import { secureCookiesFor } from "@/lib/auth/secure-cookies";
 
 const log = logger.child({ module: "Auth" });
 
@@ -52,25 +60,6 @@ global.fetch = async (input, init) => {
 
     return originalFetch(input, init);
 };
-
-/**
- * Dynamically fetch trusted origins from SSO providers in the database.
- * This allows users to configure SSO providers via UI without hardcoding origins.
- */
-async function getTrustedOriginsFromDb(): Promise<string[]> {
-    try {
-        const providers = await prisma.ssoProvider.findMany({
-            where: { enabled: true },
-            select: { issuer: true }
-        });
-        return providers
-            .map(p => p.issuer)
-            .filter((issuer): issuer is string => !!issuer);
-    } catch {
-        // During initial setup, DB might not be ready
-        return [];
-    }
-}
 
 /**
  * Cache for trusted SSO provider IDs.
@@ -137,15 +126,36 @@ const beforeAuth = createAuthMiddleware(async (ctx) => {
     }
     // The browser signs up the first account only. Later ones come from an admin or a provider.
     await refuseLateSignUp(ctx.path, Boolean(ctx.request));
+    // The issuers are trusted on this path for the endpoints of a provider, never as DBackup itself.
+    if (ctx.request && (await foreignSsoTarget(ctx.path, ctx.body, ctx.request.headers))) {
+        throw new APIError("FORBIDDEN", { code: "INVALID_ORIGIN", message: "Invalid origin" });
+    }
+    // Providers are managed on the pages of DBackup, never through the endpoints of the SSO plugin.
+    if (isSsoManagementRequest(ctx.path, Boolean(ctx.request))) throw new APIError("NOT_FOUND");
     // A provider that is off signs nobody in, not only on the login page.
     await refuseDisabledProvider(ctx, (url) => ctx.redirect(url));
+    // A passkey that is off as a way in still works as the second factor, see passkey-login-guard.ts.
+    await refusePasskeyFirstFactor(ctx);
+    // What DBackup changes through its own actions, with their checks and audit entries, never
+    // straight from the browser.
+    if (refusedFromBrowser(ctx.path, Boolean(ctx.request))) {
+        throw new APIError("FORBIDDEN", { code: "SERVER_ONLY_ENDPOINT", message: SERVER_ONLY_ENDPOINT_REFUSED });
+    }
+    // A trusted device would skip the second factor and its sign-in entry later on.
+    if (asksTrustedDevice(ctx.path, ctx.body)) {
+        throw new APIError("FORBIDDEN", { code: "TRUSTED_DEVICE", message: TRUSTED_DEVICE_REFUSED });
+    }
     // The own profile follows the group, also where the browser calls better-auth itself.
-    const needed = profilePermissionFor(ctx.path, Boolean(ctx.request));
-    if (needed) {
-        const session = await getSessionFromCtx(ctx);
-        if (session && !(await userHolds(session.user.id, needed))) {
-            throw new APIError("FORBIDDEN", { code: "PROFILE_PERMISSION", message: PROFILE_CHANGE_REFUSED });
-        }
+    if (await profileChangeRefused(ctx.path, Boolean(ctx.request), () => getSessionFromCtx(ctx))) {
+        throw new APIError("FORBIDDEN", { code: "PROFILE_PERMISSION", message: PROFILE_CHANGE_REFUSED });
+    }
+    // The password of the second factor goes through the lockout, and a passkey needs a recent sign-in.
+    await refuseWithoutReauth(ctx, () => getSessionFromCtx(ctx));
+    // What a change of the second factor or a passkey replaces, for its audit entry after it.
+    try {
+        await noteSecurityChange(ctx, () => getSessionFromCtx(ctx));
+    } catch (error) {
+        log.warn("Reading a change of the second factor or a passkey for the audit log failed", {}, wrapError(error));
     }
     // Every new password follows the rules under Settings > Passwords.
     await refuseWeakPassword(ctx, () => getSessionFromCtx(ctx));
@@ -159,13 +169,23 @@ const beforeAuth = createAuthMiddleware(async (ctx) => {
     }
 });
 
-/** Sign-ins and failed sign-ins in the audit log, whichever way someone signed in. */
+/**
+ * Sign-ins and failed sign-ins in the audit log, whichever way someone signed in, and the changes
+ * of the own second factor and passkeys the browser makes through better-auth.
+ */
 const afterAuth = createAuthMiddleware(async (ctx) => {
     try {
         await recordSignIn(ctx);
     } catch (error) {
         log.warn("Writing a sign-in to the audit log failed", {}, wrapError(error));
     }
+    try {
+        await recordSecurityChange(ctx);
+    } catch (error) {
+        log.warn("Writing a change of the second factor or a passkey to the audit log failed", {}, wrapError(error));
+    }
+    // A callback whose link a provider may not make ends on the login page with the reason.
+    refusedSsoLinkRedirect(ctx);
 });
 
 export const auth = betterAuth({
@@ -178,44 +198,25 @@ export const auth = betterAuth({
     // a single X-Forwarded-For value from anyone.
     advanced: {
         ipAddress: { ipAddressHeaders: [CLIENT_ADDRESS_HEADER] },
+        // Secure cookies whenever the browser reaches DBackup over HTTPS, also where BETTER_AUTH_URL
+        // is unset or http:// behind a proxy, see secure-cookies.ts.
+        useSecureCookies: secureCookiesFor(process.env),
     },
-    trustedOrigins: async (_request) => {
+    trustedOrigins: async (request) => {
         // Refresh trusted providers on every auth request
         // This ensures newly added SSO providers work immediately without server restart
         // We mutate the same array reference, so better-auth sees the changes
         await loadTrustedProviders();
-
-        // Base trusted origins from BETTER_AUTH_URL
-        const primaryUrl = process.env.BETTER_AUTH_URL || "http://localhost:3000";
-
-        // Additional trusted origins (comma-separated) for multiple access URLs
-        // Example: TRUSTED_ORIGINS="https://192.168.1.1:3000,https://backup.example.com"
-        const additionalOrigins = process.env.TRUSTED_ORIGINS
-            ? process.env.TRUSTED_ORIGINS.split(",").map(url => url.trim()).filter(Boolean)
-            : [];
-
-        const baseOrigins = [primaryUrl, ...additionalOrigins];
-
-        // During SSO callback, we need to trust the IdP origins
-        // Fetch them dynamically from the database
-        const ssoOrigins = await getTrustedOriginsFromDb();
-
-        return [...baseOrigins, ...ssoOrigins];
+        // The address of DBackup, and the issuers of the providers only where the SSO plugin reads
+        // their endpoints, see trusted-origins.ts.
+        return trustedOriginsFor(request);
     },
     database: prismaAdapter(prisma, {
         provider: "sqlite",
     }),
     account: {
-        // Enable automatic account linking for SSO providers
-        // All enabled SSO providers are marked as trusted for seamless linking
-        accountLinking: {
-            enabled: true,
-            // Allow linking accounts even if email domains don't match
-            allowDifferentEmails: true,
-            // Trust all enabled SSO providers - loaded from DB at startup
-            // This allows linking even if local user has emailVerified=false
-            trustedProviders: getTrustedProviders(),
-        }
+        // Linking a provider to an existing account, see account-linking.ts.
+        accountLinking: accountLinkingOptions(getTrustedProviders()),
     },
     user: {
         additionalFields: {
@@ -247,7 +248,13 @@ export const auth = betterAuth({
     },
     // A session ends after the length of Settings > Sign-in, set when it is created below, and
     // better-auth never extends it. See session-lifetime.ts.
-    session: SESSION_OPTIONS,
+    session: {
+        ...SESSION_OPTIONS,
+        // The tenant the session works in. Only the server sets it, see setActiveTenant.
+        additionalFields: {
+            activeTenantId: { type: "string", required: false, input: false },
+        },
+    },
     hooks: {
         before: beforeAuth,
         after: afterAuth,
@@ -256,13 +263,15 @@ export const auth = betterAuth({
         user: {
             create: {
                 before: async (user, context) => {
+                    // Only one sign-up from the browser makes the first account, also two at once.
+                    await claimFirstSignUp(context);
                     // The browser asks better-auth to add someone new, the provider decides.
-                    await refuseSsoSignUp(context);
-                    // Email verification is not used as a feature anywhere in DBackup
-                    // (no verification emails are sent, no login gating on this flag).
-                    // Its only remaining effect is better-auth's SSO account-linking check
-                    // (requireLocalEmailVerified, defaults to true), which otherwise blocks
-                    // linking a dashboard-created user to a matching SSO identity.
+                    await beforeSsoUser(user, context);
+                    // DBackup sends no verification emails. The flag says whether an admin or a
+                    // provider set the email, which every new account starts with, so a sign-in
+                    // provider may link the account by its email (`allowTenantSsoLink`). An email
+                    // someone picked themselves, through the own profile or an invitation, sets it
+                    // false afterwards, and such an account links only from its own profile.
                     return {
                         data: {
                             ...user,
@@ -270,18 +279,26 @@ export const auth = betterAuth({
                         },
                     };
                 },
-                after: async (user, context) => {
-                    try {
-                        await placeSsoUser(user, context);
-                    } catch (error) {
-                        log.warn("Putting a new user of a sign-in provider into its group failed", { userId: user.id }, wrapError(error));
-                    }
-                },
+                // Someone a provider added starts in its group.
+                after: afterSsoUser,
+            },
+            update: {
+                // Turning off the authenticator app leaves a passkey as the second factor on.
+                before: keepPasskeyFactor,
+            },
+        },
+        account: {
+            create: {
+                // A provider links no account it may not sign in, see sso-tenant-guard.ts.
+                before: beforeSsoLink,
+                after: afterSsoLink,
             },
         },
         session: {
             create: {
-                before: async (session) => {
+                before: async (session, context) => {
+                    // A provider signs in only an account linked to it that it may sign in, whenever it linked.
+                    await beforeSsoSession(session, context);
                     // The end of every session, from the length the owner set.
                     const expiresAt = sessionEndsAt(await getSessionDuration());
                     return {
@@ -331,6 +348,18 @@ export const auth = betterAuth({
             // requestSignUp when a provider adds new people, and refuseSsoSignUp checks the
             // provider itself, since the browser can ask for anything.
             disableImplicitSignUp: true,
+            // Columns DBackup keeps on the table of the providers that the plugin never fills.
+            // better-auth checks the table before every request and refuses every sign-in while
+            // it finds a required column it does not know. DBackup writes the providers itself,
+            // and the endpoints of the plugin that would are closed, see sso-guard.ts.
+            schema: {
+                ssoProvider: {
+                    additionalFields: {
+                        adapterId: { type: "string", required: true, input: false },
+                        name: { type: "string", required: true, input: false },
+                    },
+                },
+            },
         })
     ]
 });

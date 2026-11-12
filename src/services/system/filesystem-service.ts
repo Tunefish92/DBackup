@@ -2,8 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 import Client from "ssh2-sftp-client";
 import { overlayCredentialsOnConfig } from "@/lib/adapters/config-resolver";
+import { hostsIn } from "@/lib/adapters/dialed-hosts";
+import { answerOf } from "@/lib/adapters/adapter-answer";
 import { DBackupError, NotFoundError, ValidationError, wrapError } from "@/lib/logging/errors";
 import { logger } from "@/lib/logging/logger";
+import { currentTenantId } from "@/lib/tenant/current";
+import { assertHostsReachable, tenantReach } from "@/services/tenant/tenant-network";
+import { reachableAddress } from "@/lib/network/checked-socket";
 
 const log = logger.child({ service: "FilesystemService" });
 
@@ -129,11 +134,27 @@ export async function listRemoteDirectory({ config, path: requestedPath = "/", a
         try {
             resolved = (await overlayCredentialsOnConfig(adapterId, resolved, null, sshCredentialId)) as Record<string, unknown>;
         } catch (error: unknown) {
+            // A refusal of the config itself says why, a login that does not load stays generic.
+            if (error instanceof ValidationError) throw error;
             log.warn("Failed to overlay SSH credential for file browser", { adapterId, sshCredentialId }, wrapError(error));
             throw new ValidationError("Failed to resolve SSH credential profile");
         }
     }
+    // The browse dials this host whatever mode the form holds, so its tenant's network rule counts for it.
+    const tenantId = await currentTenantId();
+    await assertHostsReachable(tenantId, hostsIn(resolved.host));
+    // And at the address checked at connect time, see `reach-check.ts`.
+    const { policy } = await tenantReach(tenantId);
 
+    // What the server says, like a refused login or a missing folder, goes back to the picker.
+    return answerOf("sftp", "list folder", async () => {
+        const host = policy ? await reachableAddress(String(resolved.host), Number(resolved.port) || 22, policy.allowed) : resolved.host as string;
+        return listOverSftp({ ...resolved, host }, requestedPath);
+    });
+}
+
+/** Lists one folder over SFTP with a config that already holds its login. */
+async function listOverSftp(resolved: Record<string, unknown>, requestedPath: string): Promise<DirectoryListing> {
     const sftp = new Client();
     try {
         await sftp.connect({

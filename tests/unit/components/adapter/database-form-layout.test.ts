@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { getAdapterDefinition, type AdapterDefinition } from "@/lib/adapters/definitions";
-import { LOGIN_KEY, SSH_LOGIN_KEY } from "@/components/adapter/connection-form-layout";
+import { LOGIN_KEY, NAME_KEY, SSH_LOGIN_KEY } from "@/components/adapter/connection-form-layout";
 import { databaseLayout } from "@/components/adapter/database-form-layout";
 
 function adapter(id: string): AdapterDefinition {
@@ -66,6 +66,20 @@ describe("database form parts", () => {
     it("lists the Firebird aliases as a part of their own that needs at least one entry", () => {
         const aliases = databaseLayout(adapter("firebird"), { connectionMode: "direct" }).find((section) => section.id === "aliases");
         expect(aliases?.expects).toEqual(["databases"]);
+    });
+
+    it("asks for the Oracle service name beside host and port, directly and behind SSH", () => {
+        const [connection] = databaseLayout(adapter("oracle"), { connectionMode: "direct" });
+        expect(connection.keys).toEqual([NAME_KEY, "connectionMode", "host", "port", "serviceName", LOGIN_KEY]);
+        expect(connection.expects).toContain("serviceName");
+
+        const database = databaseLayout(adapter("oracle"), { connectionMode: "ssh" }).find((section) => section.id === "database");
+        expect(database?.keys).toEqual(["host", "port", "serviceName", LOGIN_KEY]);
+    });
+
+    it("lists the Data Pump directory and the Oracle switches under Options, not the service name", () => {
+        const options = databaseLayout(adapter("oracle"), { connectionMode: "direct" }).find((section) => section.id === "options")?.keys;
+        expect(options).toEqual(["directory", "consistent", "tls"]);
     });
 
     it("keeps the SQLite file in the first part locally and on its own part over SSH", () => {

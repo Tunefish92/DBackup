@@ -60,7 +60,7 @@ describe.each<HostKind>(["direct", "ssh"])("PostgreSQL browser over a %s host", 
             await getTables(baseConfig as never, "otherdb", host);
 
             const argv = host.calls.exec[0];
-            expect(argv[argv.indexOf("-d") + 1]).toBe("otherdb");
+            expect(argv[argv.indexOf("-d") + 1]).toBe("dbname='otherdb'");
             expect(argv[argv.indexOf("-h") + 1]).toBe("db.internal");
             expect(argv[argv.indexOf("-p") + 1]).toBe("5432");
             expect(argv[argv.indexOf("-U") + 1]).toBe("postgres");
@@ -138,6 +138,22 @@ describe.each<HostKind>(["direct", "ssh"])("PostgreSQL browser over a %s host", 
 
             const dataQuery = host.calls.exec.map(queryOf).find(q => q?.startsWith("SELECT * FROM"));
             expect(dataQuery).toContain("''");
+        });
+
+        it("writes values as E'' literals, so a backslash stays inside without standard_conforming_strings", async () => {
+            const host = hostWith(kind, { columns: "", count: "0\n", data: "" });
+            await getTableData(
+                baseConfig as never,
+                { database: "sh\\op", table: "us'ers", page: 1, pageSize: 10, search: "a\\' OR 1=1 --", searchColumn: "name", matchMode: "contains" } as never,
+                host,
+            );
+
+            const queries = host.calls.exec.map(queryOf);
+            const columnsQuery = queries.find(q => q?.includes("information_schema.columns"));
+            const dataQuery = queries.find(q => q?.startsWith("SELECT * FROM"));
+            expect(columnsQuery).toContain("table_catalog = E'sh\\\\op'");
+            expect(columnsQuery).toContain("table_name = E'us''ers'");
+            expect(dataQuery).toContain("ILIKE E'%a\\\\'' OR 1=1 --%'");
         });
     });
 });

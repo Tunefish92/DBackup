@@ -1,8 +1,9 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { ExecutionStatusBadge } from "@/components/dashboard/widgets/execution-status";
+import { TenantLine } from "@/components/tenant/tenant-column";
 import { DateDisplay } from "@/components/utils/date-display";
 import { cn } from "@/lib/utils";
 import { StartedCell } from "./run-cells";
@@ -27,7 +28,7 @@ export function EventChip({ eventType }: { eventType: string }) {
 }
 
 /** The columns of the notifications, with the channel and the event also as their filters. */
-export function notificationColumns(renderActions: (row: NotificationLogRow) => React.ReactNode): ColumnDef<NotificationLogRow>[] {
+export function notificationColumns(renderActions: (row: NotificationLogRow) => React.ReactNode): AppColumnDef<NotificationLogRow>[] {
     return [
         {
             id: "title",
@@ -74,8 +75,16 @@ export function notificationColumns(renderActions: (row: NotificationLogRow) => 
     ];
 }
 
+interface NotificationCardProps {
+    row: NotificationLogRow;
+    onOpen: () => void;
+    actions: React.ReactNode;
+    /** The tenant of the message, a small line under its channel in All tenants. */
+    tenantName?: string | null;
+}
+
 /** A notification on a phone. The whole card opens its message. */
-export function NotificationCard({ row, onOpen, actions }: { row: NotificationLogRow; onOpen: () => void; actions: React.ReactNode }) {
+export function NotificationCard({ row, onOpen, actions, tenantName = null }: NotificationCardProps) {
     return (
         <div className="relative min-w-0 rounded-xl border bg-card p-4 shadow-sm has-[button:focus-visible]:bg-muted/50">
             <div className="flex items-center gap-3">
@@ -86,6 +95,8 @@ export function NotificationCard({ row, onOpen, actions }: { row: NotificationLo
                 </button>
                 <div className="relative z-10">{actions}</div>
             </div>
+            {/* Under the channel, outside its button, which holds no block of its own. */}
+            <TenantLine name={tenantName} className="mt-0.5 pl-11" />
             <div className="mt-3 flex min-w-0 items-center gap-2">
                 <SentBadge ok={row.status === "Success"} />
                 <EventChip eventType={row.eventType} />

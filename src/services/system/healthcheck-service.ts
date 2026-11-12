@@ -7,6 +7,7 @@ import { wrapError, getErrorMessage } from "@/lib/logging/errors";
 import { notify, getNotificationConfig } from "@/services/notifications/system-notification-service";
 import { NOTIFICATION_EVENTS } from "@/lib/notifications/types";
 import { isAirGapped } from "@/lib/core/air-gap";
+import { STORAGE_ROLES } from "@/lib/core/storage-roles";
 
 const log = logger.child({ service: "HealthCheckService" });
 
@@ -162,6 +163,8 @@ export class HealthCheckService {
             const result = (await runConnectivityCheck(adapter, config, {
                 timeoutMs: ADAPTER_CHECK_TIMEOUT_MS,
                 label: configRow.name || configRow.id,
+                // A directory source is only read, so a read-only mount of it is no failure.
+                readOnly: configRow.type === "storage" && configRow.storageRole === STORAGE_ROLES.SOURCE,
             }))!;
             const end = Date.now();
             latency = end - start;

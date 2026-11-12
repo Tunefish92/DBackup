@@ -2,6 +2,10 @@ import { transportSuffix, type ExecutionHost } from "@/lib/transport";
 import { FirebirdConfig } from "@/lib/adapters/definitions";
 import { DatabaseInfo } from "@/lib/core/interfaces";
 import { getIsqlCommand } from "./tools";
+import { AdapterError } from "@/lib/logging/errors";
+import { validPort } from "@/lib/adapters/command-values";
+import { firebirdHostProblem } from "./host";
+import path from "path";
 
 /**
  * Resolve a job-selected alias name (config.database) to its configured
@@ -17,6 +21,25 @@ export function resolveAliasPath(config: FirebirdConfig, aliasName: string): str
     return entry.path;
 }
 
+/** Whether two database paths of a Firebird server name the same file, case aside on Windows. */
+function sameDatabasePath(a: string, b: string): boolean {
+    const windows = (value: string) => /^[a-zA-Z]:|\\/.test(value);
+    if (windows(a) || windows(b)) return path.win32.normalize(a).toLowerCase() === path.win32.normalize(b).toLowerCase();
+    return path.posix.normalize(a) === path.posix.normalize(b);
+}
+
+/**
+ * The aliases of the connection a restore target names: the alias of that name, and every alias
+ * whose file the target is, since the restore page fills in the path of an alias and a person may
+ * type it. Whatever guards a database by its name, like the databases of customers, compares these
+ * too, or a restore by path went past it. Empty for a path of no alias.
+ */
+export function aliasesOfTarget(databases: readonly { name: string; path: string }[] | undefined, target: string): string[] {
+    return (databases ?? [])
+        .filter((entry) => entry.name === target || (typeof entry.path === "string" && entry.path !== "" && sameDatabasePath(entry.path, target)))
+        .map((entry) => entry.name);
+}
+
 /**
  * Build the connection string gbak/isql use to reach a database, always via
  * the Firebird wire protocol ("host[/port]:path"). Used in both direct mode
@@ -28,8 +51,14 @@ export function resolveAliasPath(config: FirebirdConfig, aliasName: string): str
  * containerized server, which the wire protocol handles correctly instead.
  */
 export function buildConnectionString(config: FirebirdConfig, dbPath: string): string {
-    const portSegment = config.port && config.port !== 3050 ? `/${config.port}` : "";
-    return `${config.host}${portSegment}:${dbPath}`;
+    // The string is a positional argument of gbak and isql, so it never starts with `-`, which
+    // they would read as a switch. The path follows the host, so only the host can bring one.
+    // Checked here, since a stored config may predate the check on save, see `firebirdHostProblem`.
+    const problem = firebirdHostProblem(config.host);
+    if (problem) throw new AdapterError("firebird", "config", problem);
+    const port = validPort(config.port, "firebird", 3050);
+    const portSegment = port !== 3050 ? `/${port}` : "";
+    return `${String(config.host).trim()}${portSegment}:${dbPath}`;
 }
 
 /**

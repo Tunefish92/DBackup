@@ -15,7 +15,7 @@ export const STORAGE_CONNECTION_KEYS = [
     'socketPath',
 ];
 
-export const STORAGE_CONFIG_KEYS = ['pathPrefix', 'storageClass', 'forcePathStyle', 'maxProtocol', 'tls', 'options', 'folderId', 'folderPath'];
+export const STORAGE_CONFIG_KEYS = ['pathPrefix', 'storageClass', 'forcePathStyle', 'maxProtocol', 'tls', 'trustServerCertificate', 'options', 'folderId', 'folderPath'];
 
 /**
  * The config keys that say where inside the storage the files go, shown in the Location part
@@ -63,6 +63,10 @@ export const PLACEHOLDERS: Record<string, string> = {
     "redis.port": "6379",
     "valkey.port": "6379",
     "firebird.port": "3050",
+    "oracle.port": "1521",
+    "oracle.serviceName": "FREEPDB1",
+    "oracle.user": "system",
+    "oracle.directory": "DATA_PUMP_DIR",
     "email.port": "587",
     "mongodb.uri": "mongodb://user:password@localhost:27017/db?authSource=admin",
 

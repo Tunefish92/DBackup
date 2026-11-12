@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DateDisplay } from "@/components/utils/date-display";
 import { ADAPTER_DEFINITIONS } from "@/lib/adapters/definitions";
 import { formatBytes } from "@/lib/utils";
@@ -17,6 +17,9 @@ import {
     type ConnectionHealth,
 } from "./connection-cells";
 import { isAirGapped } from "@/lib/core/air-gap";
+import { FromCell, ProvidedAddressCell, SharedWithCell, providerOf } from "./connection-sharing-cells";
+import { ListedDatabasesCell, SharedBackedUpByCell, SharedDatabasesCell, SharedLastBackupCell, sharedKindLine } from "./connection-shared-cells";
+import { SharedStatusCell } from "./shared-database-status";
 
 /** The four lists on the Connections page. Each keeps its own column layout. */
 export type ConnectionKind = "database" | "source" | "destination" | "notification";
@@ -28,9 +31,19 @@ interface ColumnOptions {
     renderActions: (config: AdapterConfig) => React.ReactNode;
     /** Opens the details panel of a connection. */
     onOpen?: (config: AdapterConfig) => void;
+    /** The list holds connections or databases other tenants give this one, so a column says whose each is. */
+    withFrom?: boolean;
+    /** This tenant shares connections, so a column says who gets each. */
+    withShared?: boolean;
 }
 
 export const kindNames = new Map(ADAPTER_DEFINITIONS.map((definition) => [definition.id, definition.name]));
+
+/** The type under the name, and for a server of another tenant how many of its databases are this tenant's. */
+export function kindLine(config: AdapterConfig): string {
+    const kind = kindNames.get(config.adapterId) ?? config.adapterId;
+    return config.sharedServer ? sharedKindLine(config, config.sharedServer, kind) : kind;
+}
 
 export function healthOf(config: AdapterConfig): ConnectionHealth {
     if (!config.lastHealthCheck) return "PENDING";
@@ -53,8 +66,8 @@ export function statusDetail(config: AdapterConfig, health: ConnectionHealth): s
  * The columns of one connection list. Name and actions stay put, everything in between
  * can be moved and switched off in the Columns menu, and some start switched off.
  */
-export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }: ColumnOptions): ColumnDef<AdapterConfig>[] {
-    const name: ColumnDef<AdapterConfig> = {
+export function connectionColumns({ kind, canViewHealth, renderActions, onOpen, withFrom = false, withShared = false }: ColumnOptions): AppColumnDef<AdapterConfig>[] {
+    const name: AppColumnDef<AdapterConfig> = {
         accessorKey: "name",
         header: "Name",
         meta: { pin: "start" },
@@ -62,23 +75,25 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             <NameCell
                 adapterId={row.original.adapterId}
                 name={row.original.name}
-                kind={kindNames.get(row.original.adapterId) ?? row.original.adapterId}
+                kind={kindLine(row.original)}
                 compact={table.options.meta?.density === "compact"}
                 onOpen={onOpen ? () => onOpen(row.original) : undefined}
             />
         ),
     };
     // Only here for the Type filter. The type is already shown under the name.
-    const type: ColumnDef<AdapterConfig> = {
+    const type: AppColumnDef<AdapterConfig> = {
         accessorKey: "adapterId",
         header: "Type",
         meta: { filterOnly: true },
         filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     };
-    const status: ColumnDef<AdapterConfig> = {
+    const status: AppColumnDef<AdapterConfig> = {
         id: "status",
         header: "Status",
         cell: ({ row }) => {
+            // A server of another tenant has no health check here, its provider runs it.
+            if (row.original.sharedServer) return <SharedStatusCell terms={row.original.sharedServer} />;
             const health = healthOf(row.original);
             return (
                 <StatusCell
@@ -87,23 +102,33 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
                     lastCheckedAt={row.original.lastHealthCheck}
                     detail={statusDetail(row.original, health)}
                     error={row.original.lastError}
-                    interactive={canViewHealth}
+                    // The checks of a connection another tenant shares belong to that tenant.
+                    interactive={canViewHealth && !row.original.provided}
                     onOpen={onOpen ? () => onOpen(row.original) : undefined}
                 />
             );
         },
     };
-    const address: ColumnDef<AdapterConfig> = {
+    const address: AppColumnDef<AdapterConfig> = {
         id: "address",
         header: kind === "database" ? "Host" : kind === "notification" ? "Sends to" : "Location",
         cell: ({ row }) => {
+            if (row.original.provided || row.original.sharedServer) return <ProvidedAddressCell config={row.original} />;
             const value = connectionAddress(row.original.adapterId, row.original.config);
             if (value === undefined) return <span className="text-sm text-destructive">Invalid config</span>;
             // Long enough for a typical cloud host name. Anything longer is cut, and hovering shows all of it.
             return value ? <span className="block max-w-96 truncate text-sm" title={value}>{value}</span> : <Muted>-</Muted>;
         },
     };
-    const version: ColumnDef<AdapterConfig> = {
+    // What a server holds: of an own one as many as its last read found, of a provided one what this tenant got.
+    const databases: AppColumnDef<AdapterConfig> = {
+        id: "databases",
+        header: "Databases",
+        cell: ({ row }) => (row.original.sharedServer
+            ? <SharedDatabasesCell terms={row.original.sharedServer} />
+            : <ListedDatabasesCell listed={row.original.listedDatabases} />),
+    };
+    const version: AppColumnDef<AdapterConfig> = {
         id: "version",
         header: "Version",
         cell: ({ row }) => {
@@ -111,17 +136,21 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             return value ? <span className="text-sm tabular-nums">{value}</span> : <Muted>-</Muted>;
         },
     };
-    const usedBy: ColumnDef<AdapterConfig> = {
+    const usedBy: AppColumnDef<AdapterConfig> = {
         id: "usedBy",
         header: "Used by",
-        cell: ({ row }) => <UsedByCell usedBy={row.original.overview?.usedBy} />,
+        cell: ({ row }) => (row.original.sharedServer
+            ? <SharedBackedUpByCell terms={row.original.sharedServer} />
+            : <UsedByCell usedBy={row.original.overview?.usedBy} />),
     };
-    const lastBackup: ColumnDef<AdapterConfig> = {
+    const lastBackup: AppColumnDef<AdapterConfig> = {
         id: "lastBackup",
         header: "Last backup",
-        cell: ({ row }) => <LastRunCell run={row.original.overview ? row.original.overview.lastBackup : undefined} never="Never" />,
+        cell: ({ row }) => (row.original.sharedServer
+            ? <SharedLastBackupCell terms={row.original.sharedServer} />
+            : <LastRunCell run={row.original.overview ? row.original.overview.lastBackup : undefined} never="Never" />),
     };
-    const health = (defaultHidden: boolean): ColumnDef<AdapterConfig> => ({
+    const health = (defaultHidden: boolean): AppColumnDef<AdapterConfig> => ({
         id: "health",
         header: "Health, 24h",
         meta: { defaultHidden },
@@ -130,13 +159,13 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             return overview ? <HealthBars buckets={overview.health} passed={overview.checksPassed} airGapped={isAirGapped(row.original)} /> : <Muted>-</Muted>;
         },
     });
-    const credential: ColumnDef<AdapterConfig> = {
+    const credential: AppColumnDef<AdapterConfig> = {
         id: "credential",
         header: "Credential",
         meta: { defaultHidden: true },
         cell: ({ row }) => <CredentialCell name={row.original.overview?.credentialName} />,
     };
-    const ssh: ColumnDef<AdapterConfig> = {
+    const ssh: AppColumnDef<AdapterConfig> = {
         id: "ssh",
         header: "SSH tunnel",
         meta: { defaultHidden: true },
@@ -145,7 +174,7 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             return host ? <span className="block max-w-48 truncate text-sm" title={host}>{host}</span> : <Muted>-</Muted>;
         },
     };
-    const stored: ColumnDef<AdapterConfig> = {
+    const stored: AppColumnDef<AdapterConfig> = {
         id: "stored",
         header: "Stored",
         cell: ({ row }) => {
@@ -161,7 +190,7 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             );
         },
     };
-    const retention: ColumnDef<AdapterConfig> = {
+    const retention: AppColumnDef<AdapterConfig> = {
         id: "retention",
         header: "Default retention",
         meta: { defaultHidden: true },
@@ -170,18 +199,30 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
             return value ? <span className="block max-w-48 truncate text-sm" title={value}>{value}</span> : <Muted>-</Muted>;
         },
     };
-    const lastSent: ColumnDef<AdapterConfig> = {
+    const lastSent: AppColumnDef<AdapterConfig> = {
         id: "lastSent",
         header: "Last sent",
         cell: ({ row }) => <LastRunCell run={row.original.overview ? row.original.overview.lastSent : undefined} never="Never" />,
     };
-    const added: ColumnDef<AdapterConfig> = {
+    const added: AppColumnDef<AdapterConfig> = {
         accessorKey: "createdAt",
         header: "Added",
         meta: { defaultHidden: true },
         cell: ({ row }) => <span className="text-sm"><DateDisplay date={row.original.createdAt} format="P" /></span>,
     };
-    const actions: ColumnDef<AdapterConfig> = {
+    // Whose a connection is, and filters by it: Yours, or the tenant that shares it.
+    const from: AppColumnDef<AdapterConfig> = {
+        id: "from",
+        header: "From",
+        accessorFn: (config) => providerOf(config) ?? "Yours",
+        cell: ({ row }) => <FromCell config={row.original} />,
+    };
+    const shared: AppColumnDef<AdapterConfig> = {
+        id: "shared",
+        header: "Shared with",
+        cell: ({ row }) => <SharedWithCell config={row.original} />,
+    };
+    const actions: AppColumnDef<AdapterConfig> = {
         id: "actions",
         header: () => <span className="sr-only">Actions</span>,
         meta: { pin: "end", label: "Actions" },
@@ -189,14 +230,16 @@ export function connectionColumns({ kind, canViewHealth, renderActions, onOpen }
         cell: ({ row }) => <div className="flex justify-end">{renderActions(row.original)}</div>,
     };
 
+    const sharing = [...(withFrom ? [from] : []), ...(withShared ? [shared] : [])];
     switch (kind) {
         case "database":
-            return [name, type, status, address, version, usedBy, lastBackup, health(false), credential, ssh, added, actions];
+            // Databases are never shared out, only the databases of other tenants' servers come in.
+            return [name, type, ...(withFrom ? [from] : []), status, address, databases, version, usedBy, lastBackup, health(false), credential, ssh, added, actions];
         case "source":
             return [name, type, status, address, usedBy, lastBackup, health(true), credential, added, actions];
         case "destination":
-            return [name, type, status, address, stored, usedBy, lastBackup, health(true), retention, credential, added, actions];
+            return [name, type, ...sharing, status, address, stored, usedBy, lastBackup, health(true), retention, credential, added, actions];
         case "notification":
-            return [name, type, address, usedBy, lastSent, added, actions];
+            return [name, type, ...sharing, address, usedBy, lastSent, added, actions];
     }
 }
