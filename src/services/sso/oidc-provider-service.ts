@@ -34,7 +34,27 @@ export interface CreateSsoProviderInput {
      * This should come from the adapter as different providers have different paths.
      */
     discoveryEndpoint?: string;
-    scope?: string;
+}
+
+/**
+ * The scopes DBackup asks a provider for, what a sign-in needs and nothing more. better-auth reads
+ * them from `scopes` of the config and asks for `offline_access` too when the key is missing,
+ * which Google refuses. DBackup never uses a refresh token, so it does not ask for one.
+ */
+export const OIDC_SCOPES = ["openid", "profile", "email"];
+
+/** The scopes a saved config of better-auth names, so a change of the provider keeps them, null for none. */
+function savedScopes(oidcConfig: string | null): string[] | null {
+    if (!oidcConfig) {
+        return null;
+    }
+    try {
+        const scopes = (JSON.parse(oidcConfig) as { scopes?: unknown }).scopes;
+        const valid = Array.isArray(scopes) && scopes.length > 0 && scopes.every((scope) => typeof scope === "string");
+        return valid ? (scopes as string[]) : null;
+    } catch {
+        return null;
+    }
 }
 
 export interface UpdateSsoProviderInput extends Partial<CreateSsoProviderInput> {
@@ -94,7 +114,7 @@ export class OidcProviderService {
             tokenEndpoint: data.tokenEndpoint,
             userInfoEndpoint: data.userInfoEndpoint,
             jwksEndpoint: data.jwksEndpoint,
-            scope: data.scope || "openid profile email", // Ensure openid scope is present
+            scopes: OIDC_SCOPES,
             // discoveryEndpoint is required by better-auth even with skipDiscovery
             // It's called in the callback handler regardless of skipDiscovery setting
             discoveryEndpoint,
@@ -171,7 +191,7 @@ export class OidcProviderService {
                     ...merged,
                     clientId: encrypt(merged.clientId ?? ""),
                     clientSecret: encrypt(merged.clientSecret ?? ""),
-                    scope: data.scope || "openid profile email",
+                    scopes: savedScopes(existing.oidcConfig) ?? OIDC_SCOPES,
                     discoveryEndpoint: discEndpoint,
                     skipDiscovery: true,
                 });

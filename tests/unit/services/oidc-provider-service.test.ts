@@ -113,6 +113,17 @@ describe('OidcProviderService', () => {
             expect(oidcConfig.skipDiscovery).toBe(true);
         });
 
+        it('saves the scopes under the key better-auth reads, without offline_access', async () => {
+            prismaMock.ssoProvider.create.mockResolvedValue(mockProvider as any);
+
+            await OidcProviderService.createProvider(baseInput);
+
+            const callData = prismaMock.ssoProvider.create.mock.calls[0][0].data;
+            const oidcConfig = JSON.parse(callData.oidcConfig as string);
+            expect(oidcConfig.scopes).toEqual(['openid', 'profile', 'email']);
+            expect(oidcConfig.scope).toBeUndefined();
+        });
+
         it('sets enabled=true by default', async () => {
             prismaMock.ssoProvider.create.mockResolvedValue(mockProvider as any);
 
@@ -215,6 +226,29 @@ describe('OidcProviderService', () => {
             const oidcConfig = JSON.parse(callData.oidcConfig as string);
             expect(oidcConfig.authorizationEndpoint).toBe('https://new.example.com/authorize');
             expect(oidcConfig.skipDiscovery).toBe(true);
+        });
+
+        it('keeps the scopes saved for the provider when the config is built again', async () => {
+            const oidcConfig = JSON.stringify({ scopes: ['openid', 'email'] });
+            prismaMock.ssoProvider.findUnique.mockResolvedValue({ ...mockProvider, oidcConfig } as any);
+            prismaMock.ssoProvider.update.mockResolvedValue(mockProvider as any);
+
+            await OidcProviderService.updateProvider('prov-1', { authorizationEndpoint: 'https://new.example.com/authorize' });
+
+            const callData = prismaMock.ssoProvider.update.mock.calls[0][0].data;
+            expect(JSON.parse(callData.oidcConfig as string).scopes).toEqual(['openid', 'email']);
+        });
+
+        it('gives a provider saved with the old scope key the scopes of a sign-in', async () => {
+            const oidcConfig = JSON.stringify({ scope: 'openid profile email' });
+            prismaMock.ssoProvider.findUnique.mockResolvedValue({ ...mockProvider, oidcConfig } as any);
+            prismaMock.ssoProvider.update.mockResolvedValue(mockProvider as any);
+
+            await OidcProviderService.updateProvider('prov-1', { authorizationEndpoint: 'https://new.example.com/authorize' });
+
+            const saved = JSON.parse(prismaMock.ssoProvider.update.mock.calls[0][0].data.oidcConfig as string);
+            expect(saved.scopes).toEqual(['openid', 'profile', 'email']);
+            expect(saved.scope).toBeUndefined();
         });
 
         it('regenerates oidcConfig when clientId is updated and encrypts it', async () => {
