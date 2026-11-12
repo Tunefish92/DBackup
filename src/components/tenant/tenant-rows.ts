@@ -1,4 +1,5 @@
-import type { ColumnDef } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import type { DataTableFilterOption } from "@/components/ui/data-table-types";
 
 /**
@@ -46,7 +47,7 @@ export function matchesTenants(tenantId: string | null | undefined, picked: read
  * the first column when none is pinned, so the tenant reads next to the name. Without a Tenant
  * column the list stays as it is.
  */
-export function withTenantColumn<TData, TValue>(columns: ColumnDef<TData, TValue>[], tenant: ColumnDef<TData, TValue> | null): ColumnDef<TData, TValue>[] {
+export function withTenantColumn<TData extends RowData, TValue>(columns: AppColumnDef<TData, TValue>[], tenant: AppColumnDef<TData, TValue> | null): AppColumnDef<TData, TValue>[] {
     if (!tenant) return columns;
     let at = 0;
     columns.forEach((column, index) => {

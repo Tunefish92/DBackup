@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { DumpSizeCell, ProviderChip } from "@/components/dashboard/shared/shared-cells";
 import { cn } from "@/lib/utils";
 import type { ExplorerDestination, ExplorerJob } from "@/services/storage/explorer-types";
@@ -34,14 +34,14 @@ function JobCell({ job }: { job: ExplorerJob | undefined }) {
  * The columns of the list of every backup. The Columns menu decides which of them show. A backup of
  * a shared database fills them with its database, its provider and the size of its dump.
  */
-export function backupColumns({ jobs, destinations, at, onOpen, renderActions }: BackupColumnOptions): ColumnDef<ListRun>[] {
+export function backupColumns({ jobs, destinations, at, onOpen, renderActions }: BackupColumnOptions): AppColumnDef<ListRun>[] {
     return [
         {
             id: "backup",
             // The name is what the search looks for, the date is what the column sorts by.
             accessorFn: (run) => run.file.name,
             header: "Backup",
-            sortingFn: (a, b) => Date.parse(a.original.createdAt) - Date.parse(b.original.createdAt),
+            sortFn: (a, b) => Date.parse(a.original.createdAt) - Date.parse(b.original.createdAt),
             meta: { label: "Backup", pin: "start" },
             cell: ({ row }) => (
                 <button type="button" onClick={() => onOpen(row.original)} className="min-w-0 text-left outline-none focus-visible:underline">

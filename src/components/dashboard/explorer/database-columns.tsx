@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { CalendarClock, TriangleAlert } from "lucide-react";
 import { kindNames } from "@/components/adapter/connection-columns";
 import { DestinationTile } from "@/components/dashboard/storage/explorer/explorer-cells";
@@ -73,10 +73,10 @@ interface ColumnsInput {
 }
 
 /** The columns of the list of databases, with four only for the filters. */
-export function databaseColumns({ serversById, jobsById, coverage, biggest, renderActions }: ColumnsInput): ColumnDef<ExplorerDatabase>[] {
+export function databaseColumns({ serversById, jobsById, coverage, biggest, renderActions }: ColumnsInput): AppColumnDef<ExplorerDatabase>[] {
     const jobsOf = (database: ExplorerDatabase) => (database.jobIds.length > 0 ? database.jobIds : ["none"]);
     const stateOf = (database: ExplorerDatabase) => statesOf(database, serversById.get(database.serverId), coverage);
-    const columns: ColumnDef<ExplorerDatabase>[] = [
+    const columns: AppColumnDef<ExplorerDatabase>[] = [
         {
             id: "database",
             accessorFn: (database) => database.name,

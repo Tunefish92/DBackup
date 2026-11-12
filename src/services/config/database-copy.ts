@@ -9,6 +9,7 @@
 
 import { promises as fs } from "fs";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { createDatabaseSnapshot, type DatabaseSnapshot } from "@/services/system/database-service";
 import packageJson from "../../../package.json";
 
@@ -39,7 +40,7 @@ export interface CopyKeys {
 
 /** A client of its own on a copy, apart from the live database. The caller disconnects it. */
 export function openCopy(file: string): PrismaClient {
-    return new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    return new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
 }
 
 /**

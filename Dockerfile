@@ -65,8 +65,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Step 4: MongoDB database tools - direct CDN download for multi-arch support
     # MongoDB ships debian12 packages for x86_64 only; arm64 uses the ubuntu2204 build (compatible on Debian bookworm)
     case "${TARGETARCH:-amd64}" in \
-        amd64) MONGO_DEB="mongodb-database-tools-debian12-x86_64-100.16.1.deb" ;; \
-        arm64) MONGO_DEB="mongodb-database-tools-ubuntu2204-arm64-100.16.1.deb" ;; \
+        amd64) MONGO_DEB="mongodb-database-tools-debian12-x86_64-100.20.0.deb" ;; \
+        arm64) MONGO_DEB="mongodb-database-tools-ubuntu2204-arm64-100.20.0.deb" ;; \
         *) echo "Unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
     esac && \
     curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 "https://fastdl.mongodb.org/tools/db/${MONGO_DEB}" -o /tmp/mongo-tools.deb && \
@@ -79,10 +79,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # can talk to 3.x/4.x servers over the wire protocol - so download the official
 # Firebird release tarball and extract just the client binaries + shared library.
 #
-# Verified against the actual GitHub release assets (2026-07-04):
+# Verified against the actual GitHub release assets (2026-11-10, v5.0.4):
 # - Release tag (v${FIREBIRD_RELEASE_TAG}) and asset filename version
 #   (${FIREBIRD_ASSET_VERSION}) differ - assets embed a build number, e.g.
-#   "Firebird-5.0.3.1683-0-linux-x64.tar.gz" for tag "v5.0.3". Bump both when
+#   "Firebird-5.0.4.1812-0-linux-x64.tar.gz" for tag "v5.0.4". Bump both when
 #   upgrading.
 # - The top-level tarball only contains an install.sh + a nested
 #   buildroot.tar.gz - the actual bin/lib payload lives at
@@ -91,8 +91,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #   of which ship inside buildroot.tar.gz - installed via apt below.
 #   libicuuc/libicui18n are dlopen'd at runtime for extended collations only
 #   (soft dependency) - omitted here since backup/restore doesn't need them.
-ARG FIREBIRD_RELEASE_TAG=5.0.3
-ARG FIREBIRD_ASSET_VERSION=5.0.3.1683-0
+ARG FIREBIRD_RELEASE_TAG=5.0.4
+ARG FIREBIRD_ASSET_VERSION=5.0.4.1812-0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libtommath1 \
     zlib1g && \
@@ -214,6 +214,8 @@ COPY --from=builder --link --chown=1001:1001 /app/public ./public
 COPY --from=builder --link --chown=1001:1001 /app/.next/standalone ./
 COPY --from=builder --link --chown=1001:1001 /app/.next/static ./.next/static
 COPY --from=builder --link --chown=1001:1001 /app/prisma ./prisma
+# Where `prisma migrate deploy` finds the schema and the database since Prisma 7.
+COPY --from=builder --link --chown=1001:1001 /app/prisma.config.ts ./prisma.config.ts
 
 # Create runtime data directory + install the Prisma CLI for migrations
 # The CLI comes from the prisma-cli stage and stays owned by root, the runtime user only runs it.

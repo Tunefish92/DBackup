@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Pencil, Send } from "lucide-react";
 import type { BackupActionGroup } from "@/components/dashboard/storage/explorer/backup-actions";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the notification events. */
-export function notificationColumns({ handlers, channelsOf, switching, reminders = true, renderActions }: ColumnOptions): ColumnDef<NotificationEventRow>[] {
+export function notificationColumns({ handlers, channelsOf, switching, reminders = true, renderActions }: ColumnOptions): AppColumnDef<NotificationEventRow>[] {
     return [
         {
             accessorKey: "name",
@@ -100,7 +100,7 @@ export function notificationColumns({ handlers, channelsOf, switching, reminders
             header: "Reminder",
             enableSorting: false,
             cell: ({ row }) => <span className={cn("text-sm", (!row.original.enabled || !row.original.supportsReminder) && "text-muted-foreground")}>{row.original.enabled ? reminderText(row.original) : "-"}</span>,
-        } satisfies ColumnDef<NotificationEventRow>] : []),
+        } satisfies AppColumnDef<NotificationEventRow>] : []),
         {
             id: "enabled",
             header: "On",

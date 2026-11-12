@@ -23,6 +23,8 @@ const app = vi.hoisted(() => ({ client: null as unknown as object, requestTenant
 vi.mock("@/lib/prisma", () => ({
     default: new Proxy({}, {
         get: (_target, key) => {
+            // better-auth reads the data model of the client when it starts, before a test made one.
+            if (!app.client) return undefined;
             const value = Reflect.get(app.client, key);
             return typeof value === "function" ? value.bind(app.client) : value;
         },

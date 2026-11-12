@@ -12,6 +12,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { runAsTenant } from "@/lib/tenant/context";
 import { tenantScopeExtension } from "@/lib/tenant/prisma-scope";
 import { WHOLE_JOB_RUNS, isSingleDatabaseRun } from "@/services/history/whole-runs";
@@ -45,7 +46,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     app.client = base.$extends(tenantScopeExtension(async () => null));
     await base.adapterConfig.create({ data: { id: "server", name: "Shared MySQL", type: "database", adapterId: "mysql", config: "{}" } });
     await base.job.create({ data: { id: "nightly", name: "Nightly", schedule: "0 2 * * *", sourceId: "server" } });

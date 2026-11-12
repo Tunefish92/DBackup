@@ -11,6 +11,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { NotFoundError, TenantScopeError, ValidationError } from "@/lib/logging/errors";
 import { runAsSystem, runAsTenant } from "@/lib/tenant/context";
 import { CHILD_MODELS, TENANT_MODELS, tenantScopeExtension } from "@/lib/tenant/prisma-scope";
@@ -107,7 +108,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     scoped = extend(base);
     app.client = scoped;
     for (const tenant of TENANTS) await seedTenant(tenant);

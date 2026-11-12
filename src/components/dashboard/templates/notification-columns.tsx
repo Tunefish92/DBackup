@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { OutcomeChips } from "@/components/dashboard/jobs/notification-overview";
 import { JobIcon } from "@/components/dashboard/storage/explorer/explorer-cells";
@@ -44,7 +44,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the notification templates. Name and actions stay put, the rest can move and hide. */
-export function notificationColumns({ jobs, onOpen, renderActions }: ColumnOptions): ColumnDef<NotificationRow>[] {
+export function notificationColumns({ jobs, onOpen, renderActions }: ColumnOptions): AppColumnDef<NotificationRow>[] {
     return [
         {
             accessorKey: "name",

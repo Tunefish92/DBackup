@@ -3,7 +3,7 @@
 import { useCallback, useImperativeHandle, useMemo, useState, type Ref } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Trash } from "lucide-react";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { bulkDeleteTenantGroupTemplates } from "@/app/actions/auth/tenant-group-template";
 import { GroupCard } from "@/components/dashboard/groups/group-card";
 import { countWord, GroupTile } from "@/components/dashboard/groups/group-cells";
@@ -131,7 +131,7 @@ export function TenantGroupsList({ ref, cards, canManage, initialLayout = null }
     ), [handlers, mayOpen, editable]);
 
     // The Tenant column says where a group for tenants reaches, and its filter keeps it where it does.
-    const tenantColumn = useMemo<ColumnDef<GroupRow> | null>(() => tenant.column && {
+    const tenantColumn = useMemo<AppColumnDef<GroupRow> | null>(() => tenant.column && {
         ...tenant.column,
         filterFn: (row, id, value: string[]) => {
             if (isBuiltInRow(row.original)) return true;

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Fingerprint, Globe, KeyRound, Lock, Minus, Users } from "lucide-react";
 import { PlatformGroupTag } from "@/components/dashboard/platform/platform-group-cells";
 import { getOidcProviderIcon } from "@/components/oidc/provider-icon";
@@ -23,12 +23,12 @@ const PLATFORM_ADMIN = "platform-admin";
 const platformGroupOf = (user: UserRow) => (user.superAdmin ? PLATFORM_ADMIN : user.platformGroup?.id ?? NO_GROUP);
 
 /** The platform group of every account, on the list of every account of the Platform. */
-const platformGroupColumn: ColumnDef<UserRow> = {
+const platformGroupColumn: AppColumnDef<UserRow> = {
     id: "platformGroup",
     header: "Platform group",
     accessorFn: platformGroupOf,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-    sortingFn: (a, b) => Number(b.original.superAdmin) - Number(a.original.superAdmin) || (a.original.platformGroup?.name ?? "~").localeCompare(b.original.platformGroup?.name ?? "~"),
+    sortFn: (a, b) => Number(b.original.superAdmin) - Number(a.original.superAdmin) || (a.original.platformGroup?.name ?? "~").localeCompare(b.original.platformGroup?.name ?? "~"),
     cell: ({ row }) => <div className="max-w-44"><PlatformGroupTag user={row.original} /></div>,
 };
 
@@ -43,7 +43,7 @@ interface ColumnOptions {
 }
 
 /** The tenants of every account with the group in each, for All tenants, in place of the group of one tenant. */
-function tenantsColumn(nameOf: TenantNameOf): ColumnDef<UserRow> {
+function tenantsColumn(nameOf: TenantNameOf): AppColumnDef<UserRow> {
     const first = (user: UserRow) => namedTenants(user.tenants ?? [], nameOf)[0]?.tenantName ?? "";
     return {
         id: "tenants",
@@ -52,19 +52,19 @@ function tenantsColumn(nameOf: TenantNameOf): ColumnDef<UserRow> {
         // An account counts once for each tenant in the numbers of the filter, not as one list.
         getUniqueValues: tenantsAccessor,
         filterFn: (row, id, value: string[]) => (row.getValue(id) as string[]).some((tenantId) => value.includes(tenantId)),
-        sortingFn: (a, b) => (a.original.tenants?.length ?? 0) - (b.original.tenants?.length ?? 0) || first(a.original).localeCompare(first(b.original)),
+        sortFn: (a, b) => (a.original.tenants?.length ?? 0) - (b.original.tenants?.length ?? 0) || first(a.original).localeCompare(first(b.original)),
         cell: ({ row }) => <TenantsCell tenants={row.original.tenants ?? []} nameOf={nameOf} platform={onPlatform(row.original)} className="max-w-64" />,
     };
 }
 
 /** The columns of the users. User and actions stay put, the rest can move and hide. */
-export function userColumns({ onOpen, renderActions, tenantNameOf }: ColumnOptions): ColumnDef<UserRow>[] {
-    const group: ColumnDef<UserRow> = tenantNameOf ? tenantsColumn(tenantNameOf) : {
+export function userColumns({ onOpen, renderActions, tenantNameOf }: ColumnOptions): AppColumnDef<UserRow>[] {
+    const group: AppColumnDef<UserRow> = tenantNameOf ? tenantsColumn(tenantNameOf) : {
         id: "group",
         header: "Group",
         accessorFn: groupOf,
         filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-        sortingFn: (a, b) => (a.original.group?.name ?? "").localeCompare(b.original.group?.name ?? ""),
+        sortFn: (a, b) => (a.original.group?.name ?? "").localeCompare(b.original.group?.name ?? ""),
         cell: ({ row }) => <GroupTag group={row.original.group} platform={onPlatform(row.original)} />,
     };
     return [

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ArrowRightLeft, Building2, Eye, House, Lock, Network, Pencil, Trash2 } from "lucide-react";
 import type { BackupActionGroup } from "@/components/dashboard/storage/explorer/backup-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -146,7 +146,7 @@ function HealthDot({ health }: { health: TenantListRow["health"] }) {
 }
 
 /** The columns of the Tenants page. */
-export function tenantColumns(activeTenantId: string | null, onEdit: (row: TenantListRow) => void, renderActions: (row: TenantListRow) => React.ReactNode): ColumnDef<TenantListRow>[] {
+export function tenantColumns(activeTenantId: string | null, onEdit: (row: TenantListRow) => void, renderActions: (row: TenantListRow) => React.ReactNode): AppColumnDef<TenantListRow>[] {
     return [
         {
             accessorKey: "name",

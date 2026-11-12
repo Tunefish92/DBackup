@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { ArchiveRestore, CalendarClock, HardDrive, KeyRound, Lock, Trash2, UserRound, type LucideIcon } from "lucide-react";
 import type { BackupActionGroup } from "@/components/dashboard/storage/explorer/backup-actions";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -61,7 +61,7 @@ export function trashActions(row: TrashRow, handlers: TrashHandlers): BackupActi
 }
 
 /** The columns of Recently deleted. */
-export function trashColumns(renderActions: (row: TrashRow) => React.ReactNode): ColumnDef<TrashRow>[] {
+export function trashColumns(renderActions: (row: TrashRow) => React.ReactNode): AppColumnDef<TrashRow>[] {
     return [
         {
             accessorKey: "name",

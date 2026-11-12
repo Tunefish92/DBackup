@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Lock, TriangleAlert } from "lucide-react";
 import { AdapterIcon } from "@/components/adapter/adapter-icon";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
@@ -58,7 +58,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the credential profiles. Name and actions stay put, the rest can move and hide. */
-export function credentialColumns({ onOpen, renderActions }: ColumnOptions): ColumnDef<VaultCredential>[] {
+export function credentialColumns({ onOpen, renderActions }: ColumnOptions): AppColumnDef<VaultCredential>[] {
     return [
         {
             accessorKey: "name",

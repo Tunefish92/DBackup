@@ -1,8 +1,8 @@
 // @vitest-environment node
 /**
- * A read of more than 999 parents that orders one of their relations, against a real SQLite
- * database migrated with the migrations of this version. Prisma 6 panics on it in one statement,
- * so `relationOrderPaging` reads it in pages.
+ * A read of more than 900 parents that orders one of their relations, against a real SQLite
+ * database migrated with the migrations of this version. Prisma refuses it in one statement, so
+ * `relationOrderPaging` reads it in pages.
  */
 import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync } from "fs";
@@ -63,6 +63,12 @@ describe("a read of more than 999 jobs with their ordered destinations", () => {
         await expect(plain.job.findMany(ordered)).rejects.toThrow();
     });
 
+    it("reads one page in one statement", async () => {
+        const jobs = await plain.job.findMany({ ...ordered, take: RELATION_ORDER_PAGE });
+
+        expect(jobs).toHaveLength(RELATION_ORDER_PAGE);
+    });
+
     it("reads every job in the order asked, each with its destinations in their order", async () => {
         const paged = plain.$extends(relationOrderPaging);
 
@@ -112,12 +118,12 @@ describe("the pages of a read", () => {
         expect(ordersRelations({ select: { _count: { select: { executions: true } } } })).toBe(false);
     });
 
-    it("read in pages of 999 with the id last until a page comes back short", async () => {
+    it("read in pages of 900 with the id last until a page comes back short", async () => {
         run.mockClear();
         const rows = await pagedByParents({ orderBy: [{ name: "asc" }], include: { destinations: { orderBy: { priority: "asc" } } } }, run);
 
         expect(rows).toHaveLength(2500);
-        expect(run.mock.calls.map(([args]) => [args.skip, args.take])).toEqual([[0, 999], [999, 999], [1998, 999]]);
+        expect(run.mock.calls.map(([args]) => [args.skip, args.take])).toEqual([[0, 900], [900, 900], [1800, 900]]);
         expect(run.mock.calls[0][0].orderBy).toEqual([{ name: "asc" }, { id: "asc" }]);
     });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import type { RunRow } from "@/services/history/run-types";
 import { RunName, RunStatusCell, SizeCell, StartedCell, StarterCell, TookCell } from "./run-cells";
 import { runHref } from "./run-links";
@@ -11,7 +11,7 @@ interface ColumnsInput {
 }
 
 /** The columns of the runs, with the type, the job and who started it only for their filters. */
-export function runColumns({ now, renderActions }: ColumnsInput): ColumnDef<RunRow>[] {
+export function runColumns({ now, renderActions }: ColumnsInput): AppColumnDef<RunRow>[] {
     return [
         { id: "run", accessorFn: (row) => row.name, header: "Run", cell: ({ row }) => <RunName row={row.original} href={runHref(row.original.id)} /> },
         { id: "status", accessorFn: (row) => row.status, header: "Status", cell: ({ row }) => <RunStatusCell row={row.original} /> },

@@ -24,10 +24,10 @@ DBackup's Docker image is built on `node:24-slim` (Debian 12 bookworm) and inclu
 | :--- | :--- | :--- |
 | `mariadb-client` | Debian 12 package, MariaDB 10.11 | MySQL 5.7+, MariaDB 10+ |
 | `postgresql-client-18` | 18.x from the PGDG repository | PostgreSQL 12-18 |
-| `mongodb-database-tools` | 100.16.1 | MongoDB 4-8 |
+| `mongodb-database-tools` | 100.20.0 | MongoDB 4-8 |
 | `sqlite3` | Debian 12 package | SQLite 3.x |
 | `redis-tools` | Debian 12 package | Redis, Valkey |
-| Firebird `gbak` and `isql` | 5.0.3 | Firebird 3-5 |
+| Firebird `gbak` and `isql` | 5.0.4 | Firebird 3-5 |
 | `sqlpackage` | 170.5.96, on the .NET 10 runtime | Azure SQL Database |
 
 The image has no MySQL client of its own. DBackup calls `mariadb-dump`, `mariadb` and `mariadb-admin` first, so MySQL servers are backed up with the MariaDB tools too.

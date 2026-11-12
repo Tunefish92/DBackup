@@ -1,7 +1,8 @@
 "use client";
 
+import type { RowData } from "@tanstack/react-table";
 import * as React from "react";
-import { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Checkbox } from "@/components/ui/checkbox";
 
 /**
@@ -10,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
  * DataTable prepends this itself when row selection is enabled, so no consumer has to add
  * it to its own column list and the position stays the same everywhere.
  */
-export function selectColumn<TData>(): ColumnDef<TData, unknown> {
+export function selectColumn<TData extends RowData>(): AppColumnDef<TData, unknown> {
     return {
         id: "select",
         enableSorting: false,

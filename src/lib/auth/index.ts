@@ -348,6 +348,18 @@ export const auth = betterAuth({
             // requestSignUp when a provider adds new people, and refuseSsoSignUp checks the
             // provider itself, since the browser can ask for anything.
             disableImplicitSignUp: true,
+            // Columns DBackup keeps on the table of the providers that the plugin never fills.
+            // better-auth checks the table before every request and refuses every sign-in while
+            // it finds a required column it does not know. DBackup writes the providers itself,
+            // and the endpoints of the plugin that would are closed, see sso-guard.ts.
+            schema: {
+                ssoProvider: {
+                    additionalFields: {
+                        adapterId: { type: "string", required: true, input: false },
+                        name: { type: "string", required: true, input: false },
+                    },
+                },
+            },
         })
     ]
 });

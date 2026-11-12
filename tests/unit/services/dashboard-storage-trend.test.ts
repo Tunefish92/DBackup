@@ -12,6 +12,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import { runAsSystem, runAsTenant, type TenantScope } from "@/lib/tenant/context";
 import { tenantScopeExtension } from "@/lib/tenant/prisma-scope";
 import { invalidateDashboardCache } from "@/services/dashboard/cache";
@@ -42,7 +43,7 @@ beforeAll(async () => {
         env: { ...process.env, DATABASE_URL: `file:${file}` },
         stdio: "pipe",
     });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     // Outside a request no tenant is known. A test of All tenants sets the scope its request would name.
     app.client = base.$extends(tenantScopeExtension(async () => app.scope));
 

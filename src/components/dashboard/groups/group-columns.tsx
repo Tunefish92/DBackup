@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { Globe } from "lucide-react";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
 import { useTenantView } from "@/components/tenant/tenant-view";
@@ -82,7 +82,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the groups. Group and actions stay put, the rest can move and hide. */
-export function groupColumns({ onOpen, renderActions, markOf }: ColumnOptions): ColumnDef<GroupRow>[] {
+export function groupColumns({ onOpen, renderActions, markOf }: ColumnOptions): AppColumnDef<GroupRow>[] {
     return [
         {
             accessorKey: "name",

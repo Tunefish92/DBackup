@@ -12,6 +12,7 @@ import os from "os";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { sqliteAdapterFor } from "@/lib/sqlite-adapter";
 import type { FileInfo, StorageAdapter } from "@/lib/core/interfaces";
 import type { StorageViewMode } from "@/lib/tenant/storage-view";
 import type { LabConfig } from "../../../lab/src/config";
@@ -24,6 +25,8 @@ const app = vi.hoisted(() => ({ client: null as unknown as object }));
 vi.mock("@/lib/prisma", () => ({
     default: new Proxy({}, {
         get: (_target, key) => {
+            // better-auth reads the data model of the client when it starts, before a test made one.
+            if (!app.client) return undefined;
             const value = Reflect.get(app.client, key);
             return typeof value === "function" ? value.bind(app.client) : value;
         },
@@ -85,7 +88,7 @@ beforeAll(async () => {
     root = mkdtempSync(path.join(os.tmpdir(), "dbackup-lab-tenants-"));
     const file = path.join(root, "lab.db");
     execFileSync(path.join(process.cwd(), "node_modules", ".bin", "prisma"), ["migrate", "deploy"], { env: { ...process.env, DATABASE_URL: `file:${file}` }, stdio: "pipe" });
-    base = new PrismaClient({ datasources: { db: { url: `file:${file}` } } });
+    base = new PrismaClient({ adapter: sqliteAdapterFor(`file:${file}`) });
     app.client = base.$extends(tenantScopeExtension(async () => null));
 
     // What the seed of the home tenant made before: a lab server, the Local destination and the mail channel.

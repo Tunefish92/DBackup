@@ -59,14 +59,17 @@ const { memoryAdapter } = await import("better-auth/adapters/memory");
 const { createAuthEndpoint, createAuthMiddleware } = await import("better-auth/api");
 const { handleOAuthUserInfo } = await import("better-auth/oauth2");
 const { afterSsoLink, afterSsoUser, beforeSsoLink, beforeSsoSession, beforeSsoUser, refusedSsoLinkRedirect } = await import("@/lib/auth/sso-hooks");
-const { TENANT_DOMAIN_SIGN_UP_REFUSED } = await import("@/lib/auth/sso-guard");
+const { TENANT_DOMAIN_SIGN_UP_REFUSED, ssoSignUpRefusal } = await import("@/lib/auth/sso-guard");
 const { NOT_LINKED_URL, TENANT_NOT_MEMBER_URL, refuseSsoSession } = await import("@/lib/auth/sso-tenant-guard");
 const { accountLinkingOptions } = await import("@/lib/auth/account-linking");
 
 const ACME = { providerId: "entra-acme", name: "Acme Entra ID", tenantId: "acme", domain: "acme.ch", enabled: true, allowProvisioning: true, defaultGroupId: "g-acme" };
 const AUTHENTIK = { providerId: "authentik", name: "Authentik", tenantId: null, domain: null, enabled: true, allowProvisioning: true, defaultGroupId: "g-ops" };
 
-/** What the SSO plugin does once the provider answered, without the token exchange. */
+/**
+ * What the SSO plugin does once the provider answered, without the token exchange. Like the plugin
+ * of better-auth 1.7 it sends an error with a code to the error page, and answers any other one as it is.
+ */
 const fakeSso = {
     id: "fake-sso",
     endpoints: {
@@ -81,6 +84,11 @@ const fakeSso = {
                     disableSignUp: ctx.query.signUp !== "1",
                     isTrustedProvider: false,
                     trustProviderByName: false,
+                }).catch((error: unknown) => {
+                    const code = (error as { body?: { code?: string; message?: string } }).body?.code;
+                    if (!code) throw error;
+                    const params = new URLSearchParams({ error: code, error_description: (error as { body: { message?: string } }).body.message ?? "" });
+                    throw ctx.redirect(`/api/auth/error/error?${params}`);
                 });
                 if (linked.error) throw ctx.redirect(`/api/auth/error?error=${encodeURIComponent(linked.error)}`);
                 return ctx.json({ userId: linked.data!.user.id });
@@ -290,7 +298,7 @@ describe("a callback of a provider, through the hooks of DBackup", () => {
         const response = await callback("authentik", "mia@acme.ch", "idp-mia", { signUp: true });
 
         expect(response.status).toBe(302);
-        expect(response.headers.get("location")).toContain(encodeURIComponent(TENANT_DOMAIN_SIGN_UP_REFUSED));
+        expect(new URL(response.headers.get("location") ?? "", "http://localhost").searchParams.get("error")).toBe(ssoSignUpRefusal(TENANT_DOMAIN_SIGN_UP_REFUSED).body?.code);
         expect(state.db.user).toHaveLength(0);
         expect(state.db.session).toHaveLength(0);
     });

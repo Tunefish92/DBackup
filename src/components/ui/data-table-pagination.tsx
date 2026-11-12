@@ -1,7 +1,8 @@
 "use client";
 
+import type { RowData } from "@tanstack/react-table";
 import * as React from "react";
-import { Table } from "@tanstack/react-table";
+import type { AppTable } from "@/components/ui/table-features";
 
 import { Button } from "@/components/ui/button";
 import { PAGE_SIZES } from "@/lib/core/table-preferences";
@@ -19,8 +20,8 @@ import {
     ChevronsRight,
 } from "lucide-react";
 
-interface DataTablePaginationProps<TData> {
-    table: Table<TData>;
+interface DataTablePaginationProps<TData extends RowData> {
+    table: AppTable<TData>;
     /** Total rows behind the table. Differs from the loaded count under manual pagination. */
     totalRows: number;
     /** The first rows are still loading, so there is no total to tell yet. */
@@ -28,7 +29,7 @@ interface DataTablePaginationProps<TData> {
 }
 
 /** Row counter, page size select and pager. */
-export function DataTablePagination<TData>({ table, totalRows, loading = false }: DataTablePaginationProps<TData>) {
+export function DataTablePagination<TData extends RowData>({ table, totalRows, loading = false }: DataTablePaginationProps<TData>) {
     const selectedCount = table.getFilteredSelectedRowModel().rows.length;
 
     return (
@@ -46,13 +47,13 @@ export function DataTablePagination<TData>({ table, totalRows, loading = false }
                 <div className="hidden items-center space-x-2 sm:flex">
                     <p className="text-sm font-medium">Rows per page</p>
                     <Select
-                        value={`${table.getState().pagination.pageSize}`}
+                        value={`${table.store.state.pagination.pageSize}`}
                         onValueChange={(value) => {
                             table.setPageSize(Number(value));
                         }}
                     >
                         <SelectTrigger className="h-8 w-17.5">
-                            <SelectValue placeholder={table.getState().pagination.pageSize} />
+                            <SelectValue placeholder={table.store.state.pagination.pageSize} />
                         </SelectTrigger>
                         <SelectContent side="top">
                             {PAGE_SIZES.map((pageSize) => (
@@ -64,7 +65,7 @@ export function DataTablePagination<TData>({ table, totalRows, loading = false }
                     </Select>
                 </div>
                 <div className="flex w-25 items-center justify-center text-sm font-medium">
-                    Page {table.getState().pagination.pageIndex + 1} of{" "}
+                    Page {table.store.state.pagination.pageIndex + 1} of{" "}
                     {table.getPageCount()}
                 </div>
                 <div className="flex items-center space-x-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
+import type { AppColumnDef } from "@/components/ui/table-features";
 import { JobIcon } from "@/components/dashboard/storage/explorer/explorer-cells";
 import { RelativeTime } from "@/components/dashboard/widgets/relative-time";
 import type { DataTableFilterableColumn } from "@/components/ui/data-table";
@@ -36,7 +36,7 @@ interface ColumnOptions {
 }
 
 /** The columns of the file names. Name and actions stay put, the rest can move and hide. */
-export function namingColumns({ jobs, timezone, onOpen, renderActions }: ColumnOptions): ColumnDef<NamingRow>[] {
+export function namingColumns({ jobs, timezone, onOpen, renderActions }: ColumnOptions): AppColumnDef<NamingRow>[] {
     return [
         {
             accessorKey: "name",
