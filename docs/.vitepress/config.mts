@@ -95,6 +95,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/user-guide/getting-started' },
             { text: 'Installation', link: '/user-guide/installation' },
+            { text: 'OpenShift', link: '/user-guide/openshift' },
             { text: 'First Steps', link: '/user-guide/first-steps' }
           ]
         },

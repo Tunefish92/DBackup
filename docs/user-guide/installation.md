@@ -104,8 +104,8 @@ Access the application at [https://localhost:3000](https://localhost:3000) (acce
 | `DISABLE_HTTPS` | ❌ | Set to `true` to use plain HTTP. Default: `false` (HTTPS). **Set this when running behind a reverse proxy** - see [Reverse Proxy Setup](#reverse-proxy-setup) |
 | `TRUSTED_PROXIES` | ❌ | The reverse proxies whose `X-Forwarded-For` counts: addresses, CIDR ranges and the keywords `private` and `cloudflare`, comma-separated, or `none`. Default: `private`, the loopback and private networks, see [The Address of a Client](#the-address-of-a-client) |
 | `TRUSTED_PROXY_HEADER` | ❌ | The header these proxies write the client into: `x-forwarded-for` or `x-real-ip`. Default: `x-forwarded-for` |
-| `PUID` | ❌ | User ID the container runs as. Default: `1001` |
-| `PGID` | ❌ | Group ID the container runs as. Set it to the host's `docker` group to reach the [Docker socket](/user-guide/sources/docker-volumes). Default: `1001` |
+| `PUID` | ❌ | User ID the container runs as. Applies only to a container started as root, not on [OpenShift](/user-guide/openshift). Default: `1001` |
+| `PGID` | ❌ | Group ID the container runs as. Set it to the host's `docker` group to reach the [Docker socket](/user-guide/sources/docker-volumes). Applies only to a container started as root. Default: `1001` |
 | `DISABLE_EMAIL_LOGIN` | ❌ | Set to `true` to switch off password sign-in, leaving SSO and passkeys. Default: `false` |
 | `OIDC_AUTO_REDIRECT` | ❌ | SSO provider ID to redirect to instead of showing the login page. |
 

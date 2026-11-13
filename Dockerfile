@@ -199,6 +199,12 @@ COPY --from=builder --link /app/scripts/check-encryption-key.sh /usr/local/lib/d
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Nothing in the image calls home at runtime, so it starts and runs the same on a host without
+# internet. The Prisma CLI asks checkpoint.prisma.io for a new version at every start, and
+# SqlPackage sends usage data to Microsoft and waits for its timeout on a network that drops it.
+ENV CHECKPOINT_DISABLE=1
+ENV DACFX_TELEMETRY_OPTOUT=1
+
 # Default environment variables (can be overridden at runtime)
 ENV DATABASE_URL="file:/data/db/dbackup.db"
 ENV TZ="UTC"
@@ -224,9 +230,18 @@ COPY --from=builder --link --chown=1001:1001 /app/prisma.config.ts ./prisma.conf
 # fetches it from binaries.prisma.sh on the first start of every new container, and a host without
 # internet or without working DNS at that moment never starts. `prisma version` downloads the
 # engines here instead, and the build fails when the schema engine is still missing.
+#
+# OpenShift starts the container as an arbitrary UID in group 0 instead of root, see the start of
+# docker-entrypoint.sh. So what the app writes, /data and the cache of Next.js, belongs to group 0
+# with the rights of its owner, and so does /etc/passwd, where the entrypoint adds that UID, since
+# ssh refuses to run for a user it cannot look up. Started as root, as with Docker, the app runs as
+# PUID:PGID, and PGID is never 0, so there root alone is in group 0.
 COPY --from=prisma-cli --link /opt/prisma-cli /opt/prisma-cli
-RUN mkdir -p /data/db /data/certs && \
-    chown -R 1001:1001 /data && \
+RUN mkdir -p /data/db /data/certs /app/.next/cache && \
+    chown -R 1001:0 /data /app/.next/cache && \
+    chmod -R g=u /data /app/.next/cache && \
+    chmod g=u /etc/passwd && \
+    chmod 1777 /tmp && \
     printf '#!/bin/sh\nexec /usr/local/bin/node /opt/prisma-cli/node_modules/prisma/build/index.js "$@"\n' > /usr/local/bin/prisma && \
     chmod 755 /usr/local/bin/prisma && \
     prisma version

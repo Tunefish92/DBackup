@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-# Everything before gosu runs as root, so commands are only looked up in the system folders,
-# which only root can write, and never in a folder the runtime user owns.
+# Everything before gosu runs as root when the container starts as root, so commands are only looked
+# up in the system folders, which only root can write, and never in a folder the runtime user owns.
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
@@ -36,6 +36,41 @@ _resolve_secret BETTER_AUTH_SECRET
 # cannot be undone and the app would then refuse to start with the same key anyway.
 sh /usr/local/lib/dbackup/check-encryption-key.sh
 
+# All persistent data lives under /data (single mount point).
+# Subdirectories are created automatically if missing.
+DATA_DIR="${DATA_DIR:-/data}"
+
+# ─── Started as a user other than root ───────────────────────
+# OpenShift starts every container as an arbitrary UID in group 0, and so does `docker run --user`.
+# No user can be switched then, so everything runs as that user, PUID and PGID do not apply, and
+# DATA_DIR has to be writable for it, which OpenShift arranges for a PersistentVolumeClaim.
+if [ "$(id -u)" != "0" ]; then
+  echo "Started as UID $(id -u) GID $(id -g) instead of root, PUID and PGID do not apply"
+
+  # The arbitrary UID of OpenShift gets / as HOME, which ssh and SqlPackage cannot write to.
+  if [ ! -w "${HOME:-/}" ]; then
+    HOME=/tmp
+    export HOME
+  fi
+
+  # ssh refuses to run for a UID without an entry in /etc/passwd, which the image lets group 0 add.
+  if ! whoami >/dev/null 2>&1 && [ -w /etc/passwd ]; then
+    echo "dbackup:x:$(id -u):$(id -g):DBackup:${HOME}:/usr/sbin/nologin" >> /etc/passwd
+  fi
+
+  mkdir -p "$DATA_DIR/db" "$DATA_DIR/certs" 2>/dev/null || true
+  if [ ! -w "$DATA_DIR/db" ] || [ ! -w "$DATA_DIR/certs" ]; then
+    echo "Error: UID $(id -u) GID $(id -g) cannot write to $DATA_DIR. Mount a volume there that this user can write, on OpenShift a PersistentVolumeClaim."
+    exit 1
+  fi
+
+  # The same start as below, without gosu.
+  node /app/scripts/apply-pending-restore.js
+  node /app/scripts/backup-before-migrate.js
+  prisma migrate deploy
+  exec node custom-server.js
+fi
+
 # ─── Configurable UID/GID ────────────────────────────────────
 # Defaults match the build-time user (1001:1001).
 # Override with PUID/PGID env vars to match host user permissions.
@@ -64,9 +99,6 @@ if [ "$PUID" != "1001" ] || [ "$PGID" != "1001" ]; then
 fi
 
 # ─── Fix internal directory permissions ───────────────────────
-# All persistent data lives under /data (single mount point).
-# Subdirectories are created automatically if missing.
-DATA_DIR="${DATA_DIR:-/data}"
 mkdir -p "$DATA_DIR/db" "$DATA_DIR/certs"
 
 chown -R "$PUID:$PGID" "$DATA_DIR"
